@@ -1,28 +1,27 @@
 // ============================================================
 // FICHIER : lib/screens/biographie/evenement_detail.dart
-// Détail Événement — Compact + Navigation + DEBUG complet
+// Version SSC1 — Fiche officielle + Modifier + Supprimer + Flèches
 // ============================================================
 
 import 'package:flutter/material.dart';
 
 import '../../models/evenement_model.dart';
+import '../../models/global_info_model.dart';
 import '../../services/evenement_service.dart';
 import '../../services/global_info_service.dart';
-import '../../models/global_info_model.dart';
-
 import '../../services/event_categ_service.dart';
-import '../../models/event_categ_model.dart';
+import 'evenement_form.dart';
 
 class EvenementDetail extends StatefulWidget {
-  final EvenementModel evt;
   final List<EvenementModel> liste;
   final int index;
+  final String? critere;
 
   const EvenementDetail({
     super.key,
-    required this.evt,
     required this.liste,
     required this.index,
+    this.critere,
   });
 
   @override
@@ -38,117 +37,283 @@ class _EvenementDetailState extends State<EvenementDetail> {
   Map<int, String> _catMap = {};
 
   bool _loading = true;
+  late int _pos;
 
-  void _debug(String msg, [dynamic data]) {
-    print("DEBUG-DETAIL: $msg");
-    if (data != null) print("DEBUG-DETAIL-DATA: $data");
-  }
+  EvenementModel? _evt;
 
   @override
   void initState() {
     super.initState();
-    _debug("initState() → appel _charger()");
+    _pos = widget.index;
     _charger();
   }
 
   Future<void> _charger() async {
-    _debug("_charger() → evt.id=${widget.evt.id}, globId=${widget.evt.globId}");
+    setState(() => _loading = true);
 
-    // Charger GlobalInfo
-    if (widget.evt.globId != null) {
-      _debug("Chargement GlobalInfo pour globId=${widget.evt.globId}");
-      _info = await _globService.getById(widget.evt.globId!);
-      _debug("GlobalInfo reçu", _info);
+    // ⭐ Correction : recharger l’événement depuis Supabase
+    final idToLoad = _evt?.id ?? widget.liste[_pos].id!;
+    _evt = await _evtService.getEvenementById(idToLoad);
+
+    // ⭐ AJOUT PRINT : vérifier que glob_info est rechargé
+    if (_evt!.globId != null) {
+      print("DEBUG-GLOB: getById(${_evt!.globId})  >>>>>> _charger()");
+      _info = await _globService.getById(_evt!.globId!);
+    } else {
+      _info = null;
     }
 
-    // Charger catégories
     final cats = await _catService.getAll();
     _catMap = {for (var c in cats) c.id: c.nom};
 
     setState(() => _loading = false);
   }
 
-  // ------------------------------------------------------------
-  // SUPPRESSION
-  // ------------------------------------------------------------
-  Future<void> _supprimer() async {
-    if (widget.evt.id == null) {
-      _debug("Suppression annulée : id null");
-      return;
-    }
-
-    _debug("Suppression événement id=${widget.evt.id}");
-
-    await _evtService.deleteEvenement(widget.evt.id!);
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text("Événement supprimé")));
-
-    Navigator.pop(context, true);
-  }
-
-  // ------------------------------------------------------------
-  // FORMATAGE DATES
-  // ------------------------------------------------------------
-  String _format(DateTime? d) {
-    if (d == null) return "—";
+  String _fmt(DateTime? d) {
+    if (d == null) return "-";
     return "${d.day.toString().padLeft(2, '0')}-"
         "${d.month.toString().padLeft(2, '0')}-"
         "${d.year}";
   }
 
-  // ------------------------------------------------------------
-  // BUILD
-  // ------------------------------------------------------------
+  void _first() {
+    if (_pos > 0) {
+      _pos = 0;
+      _charger();
+    }
+  }
+
+  void _prev() {
+    if (_pos > 0) {
+      _pos--;
+      _charger();
+    }
+  }
+
+  void _next() {
+    if (_pos < widget.liste.length - 1) {
+      _pos++;
+      _charger();
+    }
+  }
+
+  void _last() {
+    if (_pos < widget.liste.length - 1) {
+      _pos = widget.liste.length - 1;
+      _charger();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final e = widget.evt;
-    final catNom = _catMap[e.categorie] ?? "—";
+    if (_loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
-    _debug("build() → affichage événement id=${e.id}, index=${widget.index}");
+    final evt = _evt!;
+    final info = _info;
+    final catNom = _catMap[evt.categorie] ?? "";
+
+    final bool ficheOfficielle = (widget.critere == null);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(e.nom),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context, true),
+        ),
+        title: Text("Evenement (${_pos + 1}/${widget.liste.length})"),
         actions: [
-          IconButton(icon: const Icon(Icons.delete), onPressed: _supprimer),
+          if (ficheOfficielle)
+            IconButton(
+              icon: const Icon(Icons.edit),
+              tooltip: "Modifier",
+              onPressed: () async {
+                final updated = await showDialog<bool>(
+                  context: context,
+                  builder: (_) => Dialog(
+                    child: SizedBox(width: 420, child: EvenementForm(evt: evt)),
+                  ),
+                );
+
+                if (updated == true) {
+                  // ⭐⭐ Recharge complet après sauvegarde
+
+                  // 1. Recharger l'événement
+                  final freshEvt = await _evtService.getEvenementById(
+                    _evt!.id!,
+                  );
+                  _evt = freshEvt;
+
+                  // 2. Recharger glob_info
+                  if (_evt!.globId != null) {
+                    print(
+                      "DEBUG-GLOB: getById(${_evt!.globId})  >>>>>> bouton Modifier",
+                    );
+                    _info = await _globService.getById(_evt!.globId!);
+                  }
+
+                  // 3. Recharger les catégories
+                  final cats = await _catService.getAll();
+                  _catMap = {for (var c in cats) c.id: c.nom};
+
+                  // 4. Rafraîchir l'affichage
+                  setState(() {});
+                }
+              },
+            ),
+
+          if (ficheOfficielle)
+            IconButton(
+              icon: const Icon(Icons.delete),
+              tooltip: "Supprimer",
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    title: const Text("Supprimer"),
+                    content: Text("Supprimer ${evt.nom} ?"),
+                    actions: [
+                      TextButton(
+                        child: const Text("Annuler"),
+                        onPressed: () => Navigator.pop(context, false),
+                      ),
+                      ElevatedButton(
+                        child: const Text("Supprimer"),
+                        onPressed: () => Navigator.pop(context, true),
+                      ),
+                    ],
+                  ),
+                );
+
+                if (confirm == true) {
+                  await _evtService.deleteEvenement(evt.id!);
+                  if (!mounted) return;
+                  Navigator.pop(context, true);
+                }
+              },
+            ),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 350),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: ListView(
+
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: ListView(
+              children: [
+                if (widget.critere != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    child: Text(
+                      "Critere : ${widget.critere}",
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ),
+
+                _ligne("ID", "${evt.id}"),
+                _ligne("Debut", _fmt(info?.debut)),
+                _ligne("Fin", _fmt(info?.fin)),
+                _ligne("Type", info?.type ?? "-"),
+                _ligne("Categorie", catNom),
+                _ligne("Nom", evt.nom),
+                _ligne("Mot cle 1", evt.motCle1 ?? ""),
+                _ligne("Mot cle 2", evt.motCle2 ?? ""),
+                _ligne("Mot cle 3", evt.motCle3 ?? ""),
+
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _ligne("ID", "${e.id}"),
-                      _ligne("Début", _format(_info?.debut)),
-                      _ligne("Fin", _format(_info?.fin)),
-                      _ligne("Type", _info?.type ?? "—"),
-                      _ligne("Catégorie", catNom),
-                      _ligne("Nom", e.nom),
-                      _ligne("Mot clé 1", e.motCle1 ?? "—"),
-                      _ligne("Mot clé 2", e.motCle2 ?? "—"),
-                      _ligne("Mot clé 3", e.motCle3 ?? "—"),
-                      _ligne("Description", e.description ?? "—"),
-                      const SizedBox(height: 20),
-                      _navigation(),
+                      const SizedBox(
+                        width: 100,
+                        child: Text(
+                          "Description",
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      Expanded(
+                        child: Container(
+                          height: 120,
+                          padding: const EdgeInsets.all(8),
+                          color: Colors.grey.shade200,
+                          child: SingleChildScrollView(
+                            child: Text(evt.description ?? ""),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
-              ),
+
+                const SizedBox(height: 20),
+
+                if (widget.liste.length > 1)
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        TextButton(
+                          onPressed: _pos > 0 ? _first : null,
+                          child: const Text(
+                            "<<",
+                            style: TextStyle(fontSize: 18),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        TextButton(
+                          onPressed: _pos > 0 ? _prev : null,
+                          child: const Text(
+                            "<-",
+                            style: TextStyle(fontSize: 18),
+                          ),
+                        ),
+                        const SizedBox(width: 20),
+                        Text(
+                          "${_pos + 1}/${widget.liste.length}",
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 20),
+                        TextButton(
+                          onPressed: _pos < widget.liste.length - 1
+                              ? _next
+                              : null,
+                          child: const Text(
+                            "->",
+                            style: TextStyle(fontSize: 18),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        TextButton(
+                          onPressed: _pos < widget.liste.length - 1
+                              ? _last
+                              : null,
+                          child: const Text(
+                            ">>",
+                            style: TextStyle(fontSize: 18),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
+          ),
+        ),
+      ),
     );
   }
 
-  // ------------------------------------------------------------
-  // WIDGETS
-  // ------------------------------------------------------------
   Widget _ligne(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -164,45 +329,6 @@ class _EvenementDetailState extends State<EvenementDetail> {
           ),
           Expanded(child: Text(value)),
         ],
-      ),
-    );
-  }
-
-  Widget _navigation() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        IconButton(
-          icon: const Icon(Icons.first_page),
-          onPressed: () => _ouvrirIndex(0),
-        ),
-        IconButton(
-          icon: const Icon(Icons.chevron_left),
-          onPressed: () => _ouvrirIndex(widget.index - 1),
-        ),
-        Text("${widget.index + 1} / ${widget.liste.length}"),
-        IconButton(
-          icon: const Icon(Icons.chevron_right),
-          onPressed: () => _ouvrirIndex(widget.index + 1),
-        ),
-        IconButton(
-          icon: const Icon(Icons.last_page),
-          onPressed: () => _ouvrirIndex(widget.liste.length - 1),
-        ),
-      ],
-    );
-  }
-
-  void _ouvrirIndex(int i) {
-    if (i < 0 || i >= widget.liste.length) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => EvenementDetail(
-          evt: widget.liste[i],
-          liste: widget.liste,
-          index: i,
-        ),
       ),
     );
   }

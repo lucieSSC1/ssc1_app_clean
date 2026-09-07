@@ -1,6 +1,6 @@
 // ============================================================
 // FICHIER : lib/services/global_info_service.dart
-// Service Supabase pour la table glob_info
+// Service GlobalInfo — Version SSC1 finale (avec fromMap)
 // ============================================================
 
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -9,51 +9,56 @@ import '../models/global_info_model.dart';
 class GlobalInfoService {
   final supabase = Supabase.instance.client;
 
-  // ------------------------------------------------------------
-  // GET BY ID
-  // ------------------------------------------------------------
+  // OBTENIR PAR ID
   Future<GlobalInfo?> getById(int id) async {
-    final response = await supabase
+    final data = await supabase
         .from('glob_info')
-        .select()
+        .select('*')
         .eq('id', id)
         .maybeSingle();
 
-    if (response == null) return null;
-    return GlobalInfo.fromJson(response);
+    if (data == null) return null;
+    return GlobalInfo.fromMap(data as Map<String, dynamic>);
   }
 
-  // ------------------------------------------------------------
-  // CREATE
-  // ------------------------------------------------------------
+  // CRÉER
   Future<GlobalInfo> create(GlobalInfo info) async {
-    final response = await supabase
+    final data = await supabase
         .from('glob_info')
         .insert(info.toJson())
-        .select()
+        .select('*')
         .maybeSingle();
 
-    if (response == null) {
-      throw Exception("Erreur création GlobalInfo");
+    if (data == null) {
+      throw Exception("Erreur création glob_info : réponse vide");
     }
 
-    return GlobalInfo.fromJson(response);
+    return GlobalInfo.fromMap(data as Map<String, dynamic>);
   }
 
-  // ------------------------------------------------------------
-  // UPDATE
-  // ------------------------------------------------------------
-  Future<void> update(GlobalInfo info) async {
-    if (info.id == null) {
-      throw Exception("GlobalInfo.id est null dans update()");
+  // METTRE À JOUR (corrigé pour éviter PGRST116)
+  Future<GlobalInfo> update(GlobalInfo info) async {
+    // 1) UPDATE sans select
+    final updateResult = await supabase
+        .from('glob_info')
+        .update(info.toJson())
+        .eq('id', info.id!);
+
+    // 2) GET dans une requête séparée
+    final data = await supabase
+        .from('glob_info')
+        .select('*')
+        .eq('id', info.id!)
+        .maybeSingle();
+
+    if (data == null) {
+      throw Exception("Erreur update glob_info : GET après update vide");
     }
 
-    await supabase.from('glob_info').update(info.toJson()).eq('id', info.id!);
+    return GlobalInfo.fromMap(data as Map<String, dynamic>);
   }
 
-  // ------------------------------------------------------------
-  // DELETE
-  // ------------------------------------------------------------
+  // SUPPRIMER
   Future<void> delete(int id) async {
     await supabase.from('glob_info').delete().eq('id', id);
   }

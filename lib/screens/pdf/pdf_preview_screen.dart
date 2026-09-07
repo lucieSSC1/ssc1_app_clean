@@ -14,10 +14,8 @@ class PdfPreviewScreen extends StatelessWidget {
     final pdf = PdfDocument.openData(data);
 
     return Scaffold(
-      appBar: AppBar(title: Text("Aperçu PDF")),
-      body: PdfView(
-        controller: PdfController(document: pdf),
-      ),
+      appBar: AppBar(title: Text("AperÃ§u PDF")),
+      body: PdfView(controller: PdfController(document: pdf)),
     );
   }
 }

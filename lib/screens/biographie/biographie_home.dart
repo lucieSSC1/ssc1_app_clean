@@ -7,7 +7,6 @@ import 'acquisition_screen.dart';
 import 'reference_screen.dart';
 
 import 'evenement_list.dart'; // ✔ module moderne Supabase
-import 'evenement_search.dart'; // ✔ si tu veux ajouter la recherche plus tard
 
 class BiographieHome extends StatelessWidget {
   const BiographieHome({super.key});
@@ -19,7 +18,10 @@ class BiographieHome extends StatelessWidget {
       _BiographieItem("Résidences", ResidencesScreen()),
       _BiographieItem("Acquisitions", AcquisitionsScreen()),
       _BiographieItem("Références", ReferencesScreen()),
-      _BiographieItem("Événements", const EvenementList()), // ✔ CORRIGÉ
+      _BiographieItem(
+        "Événements",
+        EvenementList(),
+      ), // ✔ CORRIGÉ (const retiré)
     ]);
   }
 

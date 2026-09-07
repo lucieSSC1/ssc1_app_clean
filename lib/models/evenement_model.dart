@@ -1,22 +1,17 @@
 // ============================================================
 // FICHIER : lib/models/evenement_model.dart
-// Modèle Événement — Version JOIN glob_info + DEBUG
+// Modèle Événement — Version SSC1 (propre + uniforme)
 // ============================================================
 
 class EvenementModel {
-  final int? id;
-  final int? globId;
-  final String nom;
-  final int? categorie;
+  final int? id; // ID visible (eve_id)
+  final int? globId; // FK interne → glob_info.id
+  final String nom; // Titre / nom de l’événement
+  final int? categorie; // Catégorie (event_categ.id)
   final String? motCle1;
   final String? motCle2;
   final String? motCle3;
   final String? description;
-
-  // Champs provenant de glob_info
-  final DateTime? debut;
-  final DateTime? fin;
-  final String? type;
 
   EvenementModel({
     required this.id,
@@ -27,16 +22,13 @@ class EvenementModel {
     this.motCle2,
     this.motCle3,
     this.description,
-    this.debut,
-    this.fin,
-    this.type,
   });
 
   // ------------------------------------------------------------
-  // DEBUG interne (affiche un événement complet)
+  // DEBUG SSC1
   // ------------------------------------------------------------
   void debugPrint() {
-    print("DEBUG-MODEL: EvenementModel {");
+    print("DEBUG-EVT: {");
     print("  id: $id");
     print("  globId: $globId");
     print("  nom: $nom");
@@ -45,9 +37,6 @@ class EvenementModel {
     print("  motCle2: $motCle2");
     print("  motCle3: $motCle3");
     print("  description: $description");
-    print("  debut: $debut");
-    print("  fin: $fin");
-    print("  type: $type");
     print("}");
   }
 
@@ -55,9 +44,6 @@ class EvenementModel {
   // Conversion Supabase → modèle
   // ------------------------------------------------------------
   factory EvenementModel.fromMap(Map<String, dynamic> map) {
-    // Lecture du bloc relationnel glob_info
-    final glob = map['glob_info'] as Map<String, dynamic>?;
-
     final evt = EvenementModel(
       id: map['id'] as int?,
       globId: map['glob_id'] as int?,
@@ -67,35 +53,11 @@ class EvenementModel {
       motCle2: map['mot_cle2'] as String?,
       motCle3: map['mot_cle3'] as String?,
       description: map['description'] as String?,
-
-      // Dates provenant de glob_info
-      debut: glob?['debut'] != null ? DateTime.parse(glob!['debut']) : null,
-      fin: glob?['fin'] != null ? DateTime.parse(glob!['fin']) : null,
-
-      // Type provenant de glob_info
-      type: glob?['type'] as String?,
     );
 
-    print("DEBUG-MODEL: fromMap() → événement chargé :");
+    print("DEBUG-EVT: fromMap() → événement chargé");
     evt.debugPrint();
 
     return evt;
-  }
-
-  // ------------------------------------------------------------
-  // Formatage dates compact
-  // ------------------------------------------------------------
-  String debutStr() {
-    if (debut == null) return "—";
-    return "${debut!.day.toString().padLeft(2, '0')}-"
-        "${debut!.month.toString().padLeft(2, '0')}-"
-        "${debut!.year}";
-  }
-
-  String finStr() {
-    if (fin == null) return "—";
-    return "${fin!.day.toString().padLeft(2, '0')}-"
-        "${fin!.month.toString().padLeft(2, '0')}-"
-        "${fin!.year}";
   }
 }
