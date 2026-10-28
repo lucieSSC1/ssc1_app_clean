@@ -1,87 +1,102 @@
 /* ---------------------------------------------------------------------------
    CHEMIN : lib/utils/pdf_saver.dart
-   UTILITAIRE : Sauvegarde + ouverture d’un PDF sur toutes plateformes
-   Version SSC1 — Chemin fixe + dossier + noms auto + pop-up simplifié
+   UTILITAIRE : Sauvegarde + ouverture d’un PDF via url_launcher
+   Version SSC1 — Multi‑plateforme automatique
    --------------------------------------------------------------------------- */
 
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:open_filex/open_filex.dart';
-import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-/// Dossier PDF SSC1 (Windows)
-/// IMPORTANT : doit exister ou être créé automatiquement
-const String pdfFolder = "C:/Users/Lucie/Documents/SSC1_PDF/";
+String _twoDigits(int n) => n.toString().padLeft(2, '0');
 
-/// Génère un nom unique : ssc1_evenement001.pdf
-Future<String> _generateUniqueName(String base) async {
-  final dir = Directory(pdfFolder);
-
-  if (!dir.existsSync()) {
-    dir.createSync(recursive: true);
-  }
-
-  final files = dir
-      .listSync()
-      .whereType<File>()
-      .where((f) => f.path.contains(base))
-      .toList();
-
-  int maxNum = 0;
-
-  for (var f in files) {
-    final name = f.path.split("/").last;
-
-    // Exemple : ssc1_evenement001.pdf
-    final numPart = name.replaceAll(base, "").replaceAll(".pdf", "");
-    final num = int.tryParse(numPart);
-
-    if (num != null && num > maxNum) {
-      maxNum = num;
-    }
-  }
-
-  final next = (maxNum + 1).toString().padLeft(3, '0');
-  return "$base$next.pdf";
+/// Nom unique : date + heure + secondes + millisecondes
+String _generateTimestampName(String base) {
+  final now = DateTime.now();
+  final date = "${now.year}-${_twoDigits(now.month)}-${_twoDigits(now.day)}";
+  final time =
+      "${_twoDigits(now.hour)}h${_twoDigits(now.minute)}_${_twoDigits(now.second)}_${now.millisecond}";
+  return "${base}_${date}_$time.pdf";
 }
 
-/// Sauvegarde un PDF sans l’ouvrir
-Future<String> savePdf({
-  required Uint8List bytes,
-  required String baseName, // Exemple : "ssc1_evenement"
-}) async {
-  final dir = Directory(pdfFolder);
-
-  if (!dir.existsSync()) {
-    dir.createSync(recursive: true);
+/// ⭐ Détermine automatiquement un dossier valide selon l’OS
+Future<Directory> _getPdfDirectory() async {
+  if (Platform.isWindows) {
+    final user = Platform.environment["USERNAME"] ?? "User";
+    final dir = Directory("C:/Users/$user/Documents/SSC1_PDF/");
+    if (!dir.existsSync()) dir.createSync(recursive: true);
+    return dir;
   }
 
-  final filename = await _generateUniqueName(baseName);
-  final file = File("$pdfFolder$filename");
+  if (Platform.isMacOS || Platform.isLinux) {
+    final home = Platform.environment["HOME"] ?? "";
+    final dir = Directory("$home/Documents/SSC1_PDF/");
+    if (!dir.existsSync()) dir.createSync(recursive: true);
+    return dir;
+  }
+
+  if (Platform.isAndroid || Platform.isIOS) {
+    final dir = await getApplicationDocumentsDirectory();
+    final pdfDir = Directory("${dir.path}/SSC1_PDF/");
+    if (!pdfDir.existsSync()) pdfDir.createSync(recursive: true);
+    return pdfDir;
+  }
+
+  // Fallback universel
+  final dir = await getTemporaryDirectory();
+  return dir;
+}
+
+/// ⭐ Sauvegarde seulement — NE PAS ouvrir
+/// Retourne le chemin complet du fichier
+Future<String> savePdf({
+  required Uint8List bytes,
+  required String baseName,
+}) async {
+  final dir = await _getPdfDirectory();
+  final filename = _generateTimestampName(baseName);
+  final file = File("${dir.path}/$filename");
 
   await file.writeAsBytes(bytes, flush: true);
 
   return file.path;
 }
 
-/// Ouvre un PDF existant
-Future<void> openPdf(String path) async {
-  await OpenFilex.open(path);
+/// ⭐ Ouvre le DERNIER PDF généré dans le dossier
+/// Retourne true si OK, false si aucun PDF trouvé
+Future<bool> openSavedPdf() async {
+  final dir = await _getPdfDirectory();
+
+  final files = dir
+      .listSync()
+      .whereType<File>()
+      .where((f) => f.path.toLowerCase().endsWith(".pdf"))
+      .toList();
+
+  if (files.isEmpty) return false;
+
+  // Trouver le plus récent
+  files.sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
+  final lastPdf = files.first;
+
+  final uri = Uri.file(lastPdf.path);
+
+  await launchUrl(
+    uri,
+    mode: LaunchMode.externalApplication, // ⭐ anti-cache Windows
+  );
+
+  return true;
 }
 
-/// Affiche un pop-up avec chemin complet (sans nom séparé)
-void showPdfPopup(BuildContext context, String path) {
-  showDialog(
-    context: context,
-    builder: (_) => AlertDialog(
-      title: const Text("PDF généré"),
-      content: Text("Chemin complet :\n$path"),
-      actions: [
-        TextButton(
-          child: const Text("OK"),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ],
-    ),
-  );
+/// ⭐ Fonction ancienne (générer + ouvrir) — conservée si besoin
+Future<void> saveAndOpenPdf({
+  required Uint8List bytes,
+  required String baseName,
+}) async {
+  final path = await savePdf(bytes: bytes, baseName: baseName);
+  final uri = Uri.file(path);
+
+  await launchUrl(uri, mode: LaunchMode.externalApplication);
 }

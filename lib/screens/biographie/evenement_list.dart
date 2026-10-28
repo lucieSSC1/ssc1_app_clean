@@ -1,6 +1,8 @@
 // ============================================================
 // FICHIER : lib/screens/biographie/evenement_list.dart
-// Version SSC1 — Liste principale + Loupe ID + Recherches
+// Version SSC1 — Liste principale alignée en colonnes fixes
+// Interligne réduit sérieusement (sans toucher à la hauteur de ligne)
+// Boîtes de dialogue NON dismissibles (barrierDismissible: false)
 // ============================================================
 
 import 'package:flutter/material.dart';
@@ -39,11 +41,14 @@ class _EvenementListState extends State<EvenementList> {
   final _idCtrl = TextEditingController();
 
   List<EvenementModel> _items = [];
+  List<EvenementModel> _currentList = [];
+
   Map<int, GlobalInfo?> _globMap = {};
   List<EventCateg> _categories = [];
 
+  String? _critereActuel = "Tous";
+
   bool _loading = true;
-  String? _lastPdfPath;
 
   @override
   void initState() {
@@ -51,9 +56,6 @@ class _EvenementListState extends State<EvenementList> {
     _charger();
   }
 
-  // ------------------------------------------------------------
-  // CHARGER
-  // ------------------------------------------------------------
   Future<void> _charger() async {
     _items = await _service.getAllEvenements();
     _categories = await _catService.getAll();
@@ -66,15 +68,16 @@ class _EvenementListState extends State<EvenementList> {
       }
     }
 
+    _currentList = List.from(_items);
+    _critereActuel = "Tous";
+
     setState(() => _loading = false);
   }
 
-  // ------------------------------------------------------------
-  // POPUP
-  // ------------------------------------------------------------
   Future<void> _popup(String msg) async {
     await showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (_) => AlertDialog(
         title: const Text("Info"),
         content: Text(msg),
@@ -88,146 +91,15 @@ class _EvenementListState extends State<EvenementList> {
     );
   }
 
-  // ------------------------------------------------------------
-  // LOUPE ID → FICHE OFFICIELLE + SUPPRIMER
-  // ------------------------------------------------------------
-  Future<void> _searchById() async {
-    final txt = _idCtrl.text.trim();
-    if (txt.isEmpty) return;
-
-    final id = int.tryParse(txt);
-    if (id == null) {
-      _popup("ID invalide");
-      return;
-    }
-
-    final evt = await _service.getEvenementById(id);
-
-    if (evt == null) {
-      _popup("Aucun resultat");
-      return;
-    }
-
-    // ⭐ Fiche officielle avec Modifier + Supprimer
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => EvenementDetail(liste: [evt], index: 0, critere: null),
-      ),
-    );
-
-    await _charger();
-  }
-
-  // ------------------------------------------------------------
-  // RECHERCHES → LISTE SELON CRITÈRES (pas de supprimer ici)
-  // ------------------------------------------------------------
-  Future<void> _searchTitre() async {
-    await showDialog(
-      context: context,
-      builder: (_) => RechercheTitreDialog(
-        onSearch: (titre) async {
-          final liste = await _service.searchEvenementsByTitre(titre);
-          if (liste.isEmpty) {
-            _popup("Aucun resultat");
-            return;
-          }
-
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => EvenementDetail(
-                liste: liste,
-                index: 0,
-                critere: "Titre contient $titre",
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Future<void> _searchCategorie() async {
-    await showDialog(
-      context: context,
-      builder: (_) => RechercheCategorieDialog(
-        categories: _categories,
-        onSearch: (catId) async {
-          final liste = await _service.searchEvenementsByCategorie(catId);
-
-          if (liste.isEmpty) {
-            _popup("Aucun resultat");
-            return;
-          }
-
-          final catNom = _categories.firstWhere((c) => c.id == catId).nom;
-
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => EvenementDetail(
-                liste: liste,
-                index: 0,
-                critere: "Categorie = $catNom",
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Future<void> _searchMotsCles() async {
-    await showDialog(
-      context: context,
-      builder: (_) => RechercheKeywordsDialog(
-        onSearch: (mc1, mc2, mc3, modeEt, rechercheExacte) async {
-          final liste = await _service.searchEvenementsByKeywordsEtOu(
-            mc1,
-            mc2,
-            mc3,
-            modeEt,
-            rechercheExacte,
-          );
-
-          if (liste.isEmpty) {
-            _popup("Aucun resultat");
-            return;
-          }
-
-          final crit = modeEt
-              ? "Mots-cles (ET, ${rechercheExacte ? "Exacte" : "Partielle"}) : $mc1 $mc2 $mc3"
-              : "Mots-cles (OU, ${rechercheExacte ? "Exacte" : "Partielle"}) : $mc1 $mc2 $mc3";
-
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) =>
-                  EvenementDetail(liste: liste, index: 0, critere: crit),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  // ------------------------------------------------------------
-  // FORMAT DATE dd-mm-yyyy
-  // ------------------------------------------------------------
   String _fmt(DateTime? d) {
     if (d == null) return "-";
-    return "${d.day.toString().padLeft(2, '0')}-"
-        "${d.month.toString().padLeft(2, '0')}-"
-        "${d.year}";
+    return "${d.day.toString().padLeft(2, '0')}-${d.month.toString().padLeft(2, '0')}-${d.year}";
   }
 
-  // ------------------------------------------------------------
-  // PDF — dd-mm-yyyy partout
-  // ------------------------------------------------------------
+  // ⭐ Nouveau : Générer PDF (sans ouvrir)
   Future<void> _genererPDFListe() async {
     try {
-      final data = _items.map((e) {
+      final data = _currentList.map((e) {
         final info = _globMap[e.globId];
         return {
           "id": e.id,
@@ -238,29 +110,33 @@ class _EvenementListState extends State<EvenementList> {
         };
       }).toList();
 
-      final bytes = await ChronologiePdf.generate(data, "Liste des evenements");
+      final bytes = await ChronologiePdf.generate(
+        data,
+        "Liste des evenements",
+        critere: _critereActuel,
+      );
 
       final path = await savePdf(bytes: bytes, baseName: "ssc1_evenement");
 
-      _lastPdfPath = path;
-
-      showPdfPopup(context, path);
+      _popup("PDF généré :\n$path");
     } catch (e) {
       _popup("Erreur PDF");
     }
   }
 
-  Future<void> _ouvrirPDF() async {
-    if (_lastPdfPath == null) {
-      _popup("Aucun PDF genere");
-      return;
+  // ⭐ Nouveau : Ouvrir PDF déjà généré
+  Future<void> _ouvrirPDFListe() async {
+    try {
+      final ok = await openSavedPdf();
+      if (!ok) _popup("Aucun PDF trouvé");
+    } catch (e) {
+      _popup("Erreur ouverture PDF");
     }
-    await openPdf(_lastPdfPath!);
   }
 
   Future<void> _imprimerPDF() async {
     try {
-      final data = _items.map((e) {
+      final data = _currentList.map((e) {
         final info = _globMap[e.globId];
         return {
           "id": e.id,
@@ -271,7 +147,11 @@ class _EvenementListState extends State<EvenementList> {
         };
       }).toList();
 
-      final bytes = await ChronologiePdf.generate(data, "Liste des evenements");
+      final bytes = await ChronologiePdf.generate(
+        data,
+        "Liste des evenements",
+        critere: _critereActuel,
+      );
 
       await Printing.layoutPdf(onLayout: (_) => bytes);
     } catch (e) {
@@ -279,9 +159,6 @@ class _EvenementListState extends State<EvenementList> {
     }
   }
 
-  // ------------------------------------------------------------
-  // BUILD
-  // ------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -299,11 +176,15 @@ class _EvenementListState extends State<EvenementList> {
             onPressed: () async {
               final updated = await showDialog<bool>(
                 context: context,
+                barrierDismissible: false,
                 builder: (_) => Dialog(
                   child: SizedBox(width: 420, child: const EvenementForm()),
                 ),
               );
-              if (updated == true) _charger();
+              if (updated == true) {
+                await _charger();
+                _reappliquerFiltre();
+              }
             },
           ),
 
@@ -338,31 +219,106 @@ class _EvenementListState extends State<EvenementList> {
           IconButton(
             tooltip: "Recherche par titre",
             icon: const Icon(Icons.title),
-            onPressed: _searchTitre,
+            onPressed: () async {
+              await showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (_) => RechercheTitreDialog(
+                  onSearch: (titre) async {
+                    final liste = await _service.searchEvenementsByTitre(titre);
+                    if (liste.isEmpty) {
+                      _popup("Aucun resultat");
+                      return;
+                    }
+
+                    _currentList = liste;
+                    _critereActuel = "Titre contient $titre";
+                    setState(() {});
+                  },
+                ),
+              );
+            },
           ),
 
           IconButton(
             tooltip: "Recherche par categorie",
             icon: const Icon(Icons.category),
-            onPressed: _searchCategorie,
+            onPressed: () async {
+              await showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (_) => RechercheCategorieDialog(
+                  categories: _categories,
+                  onSearch: (catId) async {
+                    final liste = await _service.searchEvenementsByCategorie(
+                      catId,
+                    );
+
+                    if (liste.isEmpty) {
+                      _popup("Aucun resultat");
+                      return;
+                    }
+
+                    final catNom = _categories
+                        .firstWhere((c) => c.id == catId)
+                        .nom;
+
+                    _currentList = liste;
+                    _critereActuel = "Categorie = $catNom";
+                    setState(() {});
+                  },
+                ),
+              );
+            },
           ),
 
           IconButton(
             tooltip: "Recherche mots-cles",
             icon: const Icon(Icons.text_snippet),
-            onPressed: _searchMotsCles,
+            onPressed: () async {
+              await showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (_) => RechercheKeywordsDialog(
+                  onSearch: (mc1, mc2, mc3, modeEt, rechercheExacte) async {
+                    final liste = await _service.searchEvenementsByKeywordsEtOu(
+                      mc1,
+                      mc2,
+                      mc3,
+                      modeEt,
+                      rechercheExacte,
+                    );
+
+                    if (liste.isEmpty) {
+                      _popup("Aucun resultat");
+                      return;
+                    }
+
+                    final crit = modeEt
+                        ? "Mots-cles (ET, ${rechercheExacte ? "Exacte" : "Partielle"}) : $mc1 $mc2 $mc3"
+                        : "Mots-cles (OU, ${rechercheExacte ? "Exacte" : "Partielle"}) : $mc1 $mc2 $mc3";
+
+                    _currentList = liste;
+                    _critereActuel = crit;
+                    setState(() {});
+                  },
+                ),
+              );
+            },
           ),
 
+          // ⭐ Nouveau : Générer PDF (sans ouvrir)
           IconButton(
             tooltip: "Generer PDF",
             icon: const Icon(Icons.picture_as_pdf),
             onPressed: _genererPDFListe,
           ),
 
+          // ⭐ Nouveau : Ouvrir PDF
           IconButton(
             tooltip: "Ouvrir PDF",
             icon: const Icon(Icons.open_in_new),
-            onPressed: _ouvrirPDF,
+            onPressed: _ouvrirPDFListe,
           ),
 
           IconButton(
@@ -375,37 +331,189 @@ class _EvenementListState extends State<EvenementList> {
 
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : _items.isEmpty
+          : _currentList.isEmpty
           ? const Center(child: Text("Aucun evenement"))
-          : ListView.builder(
-              itemCount: _items.length,
-              itemBuilder: (_, i) {
-                final e = _items[i];
-                final info = _globMap[e.globId];
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_critereActuel != null)
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Text(
+                      "Filtre : $_critereActuel",
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
 
-                final id4 = e.id.toString().padLeft(4, ' ');
-
-                final debut = _fmt(info?.debut);
-                final fin = _fmt(info?.fin);
-                final type = info?.type ?? "-";
-
-                return ListTile(
-                  title: Text("$id4 | $debut -> $fin | $type | ${e.nom}"),
-                  onTap: () async {
-                    final updated = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => EvenementDetail(
-                          liste: [e],
-                          index: 0,
-                          critere: null,
+                // ⭐ HEADER DES COLONNES
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  child: Row(
+                    children: const [
+                      SizedBox(
+                        width: 40,
+                        child: Text(
+                          "ID",
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            fontFamily: "RobotoMono",
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
-                    );
-                    if (updated == true) _charger();
-                  },
-                );
-              },
+                      SizedBox(width: 8),
+                      SizedBox(
+                        width: 80,
+                        child: Text(
+                          "Début",
+                          style: TextStyle(
+                            fontFamily: "RobotoMono",
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      SizedBox(
+                        width: 80,
+                        child: Text(
+                          "Fin",
+                          style: TextStyle(
+                            fontFamily: "RobotoMono",
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      SizedBox(
+                        width: 40,
+                        child: Text(
+                          "Type",
+                          style: TextStyle(
+                            fontFamily: "RobotoMono",
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          "Nom",
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: _currentList.length,
+                    itemBuilder: (_, i) {
+                      final e = _currentList[i];
+                      final info = _globMap[e.globId];
+
+                      final id4 = e.id.toString().padLeft(4, ' ');
+                      final debut = _fmt(info?.debut);
+                      final fin = _fmt(info?.fin);
+                      final type = (info?.type ?? "-").padRight(4);
+
+                      return GestureDetector(
+                        onTap: () async {
+                          final updated = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => EvenementDetail(
+                                liste: [e],
+                                index: 0,
+                                critere: null,
+                              ),
+                            ),
+                          );
+                          if (updated == true) {
+                            await _charger();
+                            _reappliquerFiltre();
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 2,
+                            horizontal: 8,
+                          ),
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 40,
+                                child: Text(
+                                  id4,
+                                  textAlign: TextAlign.right,
+                                  style: const TextStyle(
+                                    fontFamily: "RobotoMono",
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                width: 80,
+                                child: Text(
+                                  debut,
+                                  style: const TextStyle(
+                                    fontFamily: "RobotoMono",
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                width: 80,
+                                child: Text(
+                                  fin == "-" ? "          " : fin,
+                                  style: const TextStyle(
+                                    fontFamily: "RobotoMono",
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                width: 40,
+                                child: Text(
+                                  type,
+                                  style: const TextStyle(
+                                    fontFamily: "RobotoMono",
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  e.nom,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
 
       bottomNavigationBar: Padding(
@@ -416,5 +524,53 @@ class _EvenementListState extends State<EvenementList> {
         ),
       ),
     );
+  }
+
+  void _reappliquerFiltre() {
+    if (_critereActuel == null || _critereActuel == "Tous") {
+      _currentList = List.from(_items);
+      return;
+    }
+
+    if (_critereActuel!.startsWith("Titre contient")) {
+      final mot = _critereActuel!.substring("Titre contient ".length);
+      _currentList = _items.where((e) => e.nom.contains(mot)).toList();
+    }
+
+    if (_critereActuel!.startsWith("Categorie =")) {
+      final catNom = _critereActuel!.substring("Categorie = ".length);
+      final cat = _categories.firstWhere((c) => c.nom == catNom);
+      _currentList = _items.where((e) => e.categorie == cat.id).toList();
+    }
+  }
+
+  Future<void> _searchById() async {
+    final txt = _idCtrl.text.trim();
+    if (txt.isEmpty) return;
+
+    final id = int.tryParse(txt);
+    if (id == null) {
+      _popup("ID invalide");
+      return;
+    }
+
+    final evt = await _service.getEvenementById(id);
+
+    if (evt == null) {
+      _popup("Aucun resultat");
+      return;
+    }
+
+    final updated = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EvenementDetail(liste: [evt], index: 0, critere: null),
+      ),
+    );
+
+    if (updated == true) {
+      await _charger();
+      _reappliquerFiltre();
+    }
   }
 }

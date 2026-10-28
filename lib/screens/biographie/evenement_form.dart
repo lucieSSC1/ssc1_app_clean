@@ -54,13 +54,11 @@ class _EvenementFormState extends State<EvenementForm> {
     _categories = await _catService.getAll();
 
     if (widget.evt == null) {
-      // Mode AJOUTER
       _debut = DateTime.now();
       _fin = null;
       _type = "EVE";
       _categorie = null;
     } else {
-      // Mode MODIFIER
       final e = widget.evt!;
       _nomCtrl.text = e.nom;
       _descCtrl.text = e.description ?? "";
@@ -69,7 +67,6 @@ class _EvenementFormState extends State<EvenementForm> {
       _mc3Ctrl.text = e.motCle3 ?? "";
       _categorie = e.categorie;
 
-      // Si info déjà fournie
       if (widget.info != null) {
         _debut = widget.info!.debut;
         _fin = widget.info!.fin;
@@ -78,7 +75,6 @@ class _EvenementFormState extends State<EvenementForm> {
         return;
       }
 
-      // Sinon recharger glob_info
       if (e.globId != null) {
         final info = await _globService.getById(e.globId!);
         if (info != null) {
@@ -93,9 +89,6 @@ class _EvenementFormState extends State<EvenementForm> {
     setState(() {});
   }
 
-  // ------------------------------------------------------------
-  // VALIDATION
-  // ------------------------------------------------------------
   Map<String, String?> _validate() {
     final errors = <String, String?>{};
 
@@ -149,9 +142,6 @@ class _EvenementFormState extends State<EvenementForm> {
     }
   }
 
-  // ------------------------------------------------------------
-  // SAUVEGARDE — VERSION FINALE SSC1
-  // ------------------------------------------------------------
   Future<void> _save() async {
     final errors = _validate();
 
@@ -163,15 +153,6 @@ class _EvenementFormState extends State<EvenementForm> {
     setState(() => _loading = true);
 
     try {
-      print("DEBUG-FORM: SAVE démarré");
-      print(
-        "DEBUG-FORM: evt.id = ${widget.evt?.id}, globId = ${widget.evt?.globId}",
-      );
-      print(
-        "DEBUG-FORM: debut = $_debut, fin = $_fin, type = $_type, categorie = $_categorie",
-      );
-
-      // 1) Construire glob_info
       GlobalInfo glob = GlobalInfo(
         id: widget.evt?.globId,
         debut: _debut,
@@ -179,30 +160,17 @@ class _EvenementFormState extends State<EvenementForm> {
         type: _type ?? "EVE",
       );
 
-      print("DEBUG-FORM: avant create/update glob_info, glob.id = ${glob.id}");
-
-      // 2) UPDATE glob_info (ou CREATE)
       if (glob.id == null) {
         glob = await _globService.create(glob);
-        print("DEBUG-FORM: glob_info créé, id = ${glob.id}");
       } else {
         glob = await _globService.update(glob);
-        print("DEBUG-FORM: glob_info mis à jour, id = ${glob.id}");
-        print(
-          "DEBUG-FORM: retour de _globService.update(glob) → id=${glob.id}, debut=${glob.debut}, fin=${glob.fin}, type=${glob.type}",
-        );
       }
 
-      // ⭐⭐ Recharger glob_info après update pour refléter ce que Supabase renvoie
       final freshGlob = await _globService.getById(glob.id!);
       _debut = freshGlob?.debut;
       _fin = freshGlob?.fin;
       _type = freshGlob?.type;
-      print(
-        "DEBUG-FORM: après getById(glob.id), debut=${_debut}, fin=${_fin}, type=${_type}",
-      );
 
-      // 3) Construire evenement
       EvenementModel evt = EvenementModel(
         id: widget.evt?.id,
         nom: _nomCtrl.text.trim(),
@@ -214,34 +182,21 @@ class _EvenementFormState extends State<EvenementForm> {
         globId: glob.id,
       );
 
-      print(
-        "DEBUG-FORM: avant create/update evenement, evt.id = ${evt.id}, globId = ${evt.globId}",
-      );
-
-      // 4) UPDATE evenement (ou CREATE)
       if (evt.id == null) {
         evt = await _evtService.createEvenement(evt);
-        print("DEBUG-FORM: evenement créé, id = ${evt.id}");
       } else {
         evt = await _evtService.updateEvenement(evt);
-        print("DEBUG-FORM: evenement mis à jour, id = ${evt.id}");
       }
 
       if (!mounted) return;
       Navigator.pop(context, true);
     } catch (e) {
-      print("DEBUG-FORM: ERREUR SAVE brute = $e");
-
       String msg = "Erreur système lors de la sauvegarde";
 
       if (e is PostgrestException) {
         final code = e.code;
         final details = e.details;
         final message = e.message;
-
-        print(
-          "DEBUG-FORM: PostgrestException code=$code, details=$details, message=$message",
-        );
 
         if (code == "PGRST116") {
           msg =
@@ -261,6 +216,7 @@ class _EvenementFormState extends State<EvenementForm> {
   Future<void> _popup(String msg) async {
     await showDialog(
       context: context,
+      barrierDismissible: false, // ⭐ Correction
       builder: (_) => AlertDialog(
         title: const Text("Info"),
         content: Text(msg),
@@ -274,9 +230,6 @@ class _EvenementFormState extends State<EvenementForm> {
     );
   }
 
-  // ------------------------------------------------------------
-  // BUILD
-  // ------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     final errors = _showErrors ? _validate() : {};
@@ -311,7 +264,6 @@ class _EvenementFormState extends State<EvenementForm> {
               child: ListView(
                 shrinkWrap: true,
                 children: [
-                  // Début
                   Row(
                     children: [
                       const SizedBox(
@@ -328,7 +280,6 @@ class _EvenementFormState extends State<EvenementForm> {
                     ],
                   ),
 
-                  // Fin + message rouge
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -362,7 +313,6 @@ class _EvenementFormState extends State<EvenementForm> {
                     ],
                   ),
 
-                  // Type
                   Row(
                     children: [
                       const SizedBox(
@@ -378,7 +328,6 @@ class _EvenementFormState extends State<EvenementForm> {
 
                   const SizedBox(height: 10),
 
-                  // Catégorie
                   DropdownButtonFormField<int>(
                     value: _categorie,
                     decoration: InputDecoration(
@@ -397,7 +346,6 @@ class _EvenementFormState extends State<EvenementForm> {
                     },
                   ),
 
-                  // Nom
                   TextField(
                     controller: _nomCtrl,
                     decoration: InputDecoration(
@@ -409,7 +357,6 @@ class _EvenementFormState extends State<EvenementForm> {
                     },
                   ),
 
-                  // Mot-clé 1 (rouge)
                   TextField(
                     controller: _mc1Ctrl,
                     decoration: InputDecoration(
@@ -421,7 +368,6 @@ class _EvenementFormState extends State<EvenementForm> {
                     },
                   ),
 
-                  // Mot-clé 2
                   TextField(
                     controller: _mc2Ctrl,
                     decoration: const InputDecoration(labelText: "Mot clé 2"),
@@ -430,7 +376,6 @@ class _EvenementFormState extends State<EvenementForm> {
                     },
                   ),
 
-                  // Mot-clé 3
                   TextField(
                     controller: _mc3Ctrl,
                     decoration: const InputDecoration(labelText: "Mot clé 3"),
@@ -439,7 +384,6 @@ class _EvenementFormState extends State<EvenementForm> {
                     },
                   ),
 
-                  // Description
                   TextField(
                     controller: _descCtrl,
                     decoration: const InputDecoration(labelText: "Description"),

@@ -1,15 +1,18 @@
 // ============================================================
 // FICHIER : lib/screens/biographie/evenement_detail.dart
-// Version SSC1 — Fiche officielle + Modifier + Supprimer + Flèches
+// Version SSC1 — Fiche officielle + Modifier + Supprimer + Imprimer PDF
 // ============================================================
 
 import 'package:flutter/material.dart';
+import 'package:printing/printing.dart';
 
 import '../../models/evenement_model.dart';
 import '../../models/global_info_model.dart';
 import '../../services/evenement_service.dart';
 import '../../services/global_info_service.dart';
 import '../../services/event_categ_service.dart';
+
+import '../../pdf/fiche_pdf.dart';
 import 'evenement_form.dart';
 
 class EvenementDetail extends StatefulWidget {
@@ -51,13 +54,10 @@ class _EvenementDetailState extends State<EvenementDetail> {
   Future<void> _charger() async {
     setState(() => _loading = true);
 
-    // ⭐ Correction : recharger l’événement depuis Supabase
     final idToLoad = _evt?.id ?? widget.liste[_pos].id!;
     _evt = await _evtService.getEvenementById(idToLoad);
 
-    // ⭐ AJOUT PRINT : vérifier que glob_info est rechargé
     if (_evt!.globId != null) {
-      print("DEBUG-GLOB: getById(${_evt!.globId})  >>>>>> _charger()");
       _info = await _globService.getById(_evt!.globId!);
     } else {
       _info = null;
@@ -76,32 +76,40 @@ class _EvenementDetailState extends State<EvenementDetail> {
         "${d.year}";
   }
 
-  void _first() {
-    if (_pos > 0) {
-      _pos = 0;
-      _charger();
-    }
-  }
+  // ------------------------------------------------------------
+  // IMPRIMER PDF INDIVIDUEL
+  // ------------------------------------------------------------
+  Future<void> _imprimerPDFIndividuel() async {
+    if (_evt == null) return;
 
-  void _prev() {
-    if (_pos > 0) {
-      _pos--;
-      _charger();
-    }
-  }
+    final evt = _evt!;
+    final info = _info;
 
-  void _next() {
-    if (_pos < widget.liste.length - 1) {
-      _pos++;
-      _charger();
-    }
-  }
+    final dataEvt = {
+      "id": evt.id,
+      "nom": evt.nom,
+      "categorie": _catMap[evt.categorie] ?? "-",
+      "motCle1": evt.motCle1 ?? "",
+      "motCle2": evt.motCle2 ?? "",
+      "motCle3": evt.motCle3 ?? "",
+      "description": evt.description ?? "",
+    };
 
-  void _last() {
-    if (_pos < widget.liste.length - 1) {
-      _pos = widget.liste.length - 1;
-      _charger();
-    }
+    final dataGlob = info == null
+        ? null
+        : {
+            "debut": _fmt(info.debut),
+            "fin": _fmt(info.fin),
+            "type": info.type ?? "-",
+          };
+
+    final bytes = await FichePdf.generate(
+      evt: dataEvt,
+      glob: dataGlob,
+      critere: widget.critere,
+    );
+
+    await Printing.layoutPdf(onLayout: (_) => bytes);
   }
 
   @override
@@ -122,7 +130,7 @@ class _EvenementDetailState extends State<EvenementDetail> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context, true),
         ),
-        title: Text("Evenement (${_pos + 1}/${widget.liste.length})"),
+        title: const Text("Fiche événement"),
         actions: [
           if (ficheOfficielle)
             IconButton(
@@ -131,33 +139,25 @@ class _EvenementDetailState extends State<EvenementDetail> {
               onPressed: () async {
                 final updated = await showDialog<bool>(
                   context: context,
+                  barrierDismissible: false,
                   builder: (_) => Dialog(
                     child: SizedBox(width: 420, child: EvenementForm(evt: evt)),
                   ),
                 );
 
                 if (updated == true) {
-                  // ⭐⭐ Recharge complet après sauvegarde
-
-                  // 1. Recharger l'événement
                   final freshEvt = await _evtService.getEvenementById(
                     _evt!.id!,
                   );
                   _evt = freshEvt;
 
-                  // 2. Recharger glob_info
                   if (_evt!.globId != null) {
-                    print(
-                      "DEBUG-GLOB: getById(${_evt!.globId})  >>>>>> bouton Modifier",
-                    );
                     _info = await _globService.getById(_evt!.globId!);
                   }
 
-                  // 3. Recharger les catégories
                   final cats = await _catService.getAll();
                   _catMap = {for (var c in cats) c.id: c.nom};
 
-                  // 4. Rafraîchir l'affichage
                   setState(() {});
                 }
               },
@@ -170,17 +170,18 @@ class _EvenementDetailState extends State<EvenementDetail> {
               onPressed: () async {
                 final confirm = await showDialog<bool>(
                   context: context,
+                  barrierDismissible: false,
                   builder: (_) => AlertDialog(
                     title: const Text("Supprimer"),
                     content: Text("Supprimer ${evt.nom} ?"),
                     actions: [
-                      TextButton(
-                        child: const Text("Annuler"),
-                        onPressed: () => Navigator.pop(context, false),
-                      ),
                       ElevatedButton(
                         child: const Text("Supprimer"),
                         onPressed: () => Navigator.pop(context, true),
+                      ),
+                      ElevatedButton(
+                        child: const Text("Annuler"),
+                        onPressed: () => Navigator.pop(context, false),
                       ),
                     ],
                   ),
@@ -193,6 +194,12 @@ class _EvenementDetailState extends State<EvenementDetail> {
                 }
               },
             ),
+
+          IconButton(
+            icon: const Icon(Icons.print),
+            tooltip: "Imprimer PDF",
+            onPressed: _imprimerPDFIndividuel,
+          ),
         ],
       ),
 
@@ -207,7 +214,7 @@ class _EvenementDetailState extends State<EvenementDetail> {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 20),
                     child: Text(
-                      "Critere : ${widget.critere}",
+                      "Critère : ${widget.critere}",
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -218,14 +225,17 @@ class _EvenementDetailState extends State<EvenementDetail> {
                   ),
 
                 _ligne("ID", "${evt.id}"),
-                _ligne("Debut", _fmt(info?.debut)),
+                _ligne("Début", _fmt(info?.debut)),
                 _ligne("Fin", _fmt(info?.fin)),
-                _ligne("Type", info?.type ?? "-"),
-                _ligne("Categorie", catNom),
+
+                // ⭐ NOM juste sous FIN
                 _ligne("Nom", evt.nom),
-                _ligne("Mot cle 1", evt.motCle1 ?? ""),
-                _ligne("Mot cle 2", evt.motCle2 ?? ""),
-                _ligne("Mot cle 3", evt.motCle3 ?? ""),
+
+                _ligne("Type", info?.type ?? "-"),
+                _ligne("Catégorie", catNom),
+                _ligne("Mot clé 1", evt.motCle1 ?? ""),
+                _ligne("Mot clé 2", evt.motCle2 ?? ""),
+                _ligne("Mot clé 3", evt.motCle3 ?? ""),
 
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
@@ -233,7 +243,7 @@ class _EvenementDetailState extends State<EvenementDetail> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(
-                        width: 100,
+                        width: 80,
                         child: Text(
                           "Description",
                           style: TextStyle(fontWeight: FontWeight.bold),
@@ -241,7 +251,7 @@ class _EvenementDetailState extends State<EvenementDetail> {
                       ),
                       Expanded(
                         child: Container(
-                          height: 120,
+                          height: 180,
                           padding: const EdgeInsets.all(8),
                           color: Colors.grey.shade200,
                           child: SingleChildScrollView(
@@ -252,60 +262,6 @@ class _EvenementDetailState extends State<EvenementDetail> {
                     ],
                   ),
                 ),
-
-                const SizedBox(height: 20),
-
-                if (widget.liste.length > 1)
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        TextButton(
-                          onPressed: _pos > 0 ? _first : null,
-                          child: const Text(
-                            "<<",
-                            style: TextStyle(fontSize: 18),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        TextButton(
-                          onPressed: _pos > 0 ? _prev : null,
-                          child: const Text(
-                            "<-",
-                            style: TextStyle(fontSize: 18),
-                          ),
-                        ),
-                        const SizedBox(width: 20),
-                        Text(
-                          "${_pos + 1}/${widget.liste.length}",
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 20),
-                        TextButton(
-                          onPressed: _pos < widget.liste.length - 1
-                              ? _next
-                              : null,
-                          child: const Text(
-                            "->",
-                            style: TextStyle(fontSize: 18),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        TextButton(
-                          onPressed: _pos < widget.liste.length - 1
-                              ? _last
-                              : null,
-                          child: const Text(
-                            ">>",
-                            style: TextStyle(fontSize: 18),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
               ],
             ),
           ),

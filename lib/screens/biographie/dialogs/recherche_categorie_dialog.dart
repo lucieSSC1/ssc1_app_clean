@@ -24,6 +24,23 @@ class RechercheCategorieDialog extends StatefulWidget {
 class _RechercheCategorieDialogState extends State<RechercheCategorieDialog> {
   int? _cat;
 
+  Future<void> _popup(String msg) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false, // ⭐ Correction
+      builder: (_) => AlertDialog(
+        title: const Text("Recherche"),
+        content: Text(msg),
+        actions: [
+          TextButton(
+            child: const Text("OK"),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -61,18 +78,18 @@ class _RechercheCategorieDialogState extends State<RechercheCategorieDialog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // ⭐ RECHERCHER (à gauche)
                   ElevatedButton(
                     child: const Text("Rechercher"),
-                    onPressed: () {
-                      if (_cat != null) {
-                        widget.onSearch(_cat!);
+                    onPressed: () async {
+                      if (_cat == null) {
+                        await _popup("Choisir une catégorie.");
+                        return;
                       }
+                      widget.onSearch(_cat!);
                       Navigator.pop(context);
                     },
                   ),
 
-                  // ⭐ ANNULER (à droite)
                   ElevatedButton(
                     child: const Text("Annuler"),
                     onPressed: () => Navigator.pop(context),

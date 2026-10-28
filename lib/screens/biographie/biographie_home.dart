@@ -1,12 +1,17 @@
+// ssc1_app/lib/screens/biographie/biographie_home.dart
+//
+// Écran : Menu Biographie (version SSC1)
+// --------------------------------------
+
 import 'package:flutter/material.dart';
 
 // Import des écrans internes
 import 'identite_screen.dart';
 import 'residence_screen.dart';
-import 'acquisition_screen.dart';
+import '../acquisition/acquisition_list.dart';
 import 'reference_screen.dart';
 
-import 'evenement_list.dart'; // ✔ module moderne Supabase
+import 'evenement_list.dart';
 
 class BiographieHome extends StatelessWidget {
   const BiographieHome({super.key});
@@ -14,14 +19,11 @@ class BiographieHome extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _buildButtonGrid(context, [
-      _BiographieItem("Identité", IdentiteScreen()),
-      _BiographieItem("Résidences", ResidencesScreen()),
-      _BiographieItem("Acquisitions", AcquisitionsScreen()),
-      _BiographieItem("Références", ReferencesScreen()),
-      _BiographieItem(
-        "Événements",
-        EvenementList(),
-      ), // ✔ CORRIGÉ (const retiré)
+      _BiographieItem("Identité", const IdentiteScreen()),
+      _BiographieItem("Résidences", const ResidencesScreen()),
+      _BiographieItem("Acquisitions", AcquisitionList()),
+      _BiographieItem("Références", const ReferencesScreen()),
+      _BiographieItem("Événements", EvenementList()),
     ]);
   }
 
@@ -54,5 +56,5 @@ class _BiographieItem {
   final String label;
   final Widget screen;
 
-  _BiographieItem(this.label, this.screen);
+  const _BiographieItem(this.label, this.screen);
 }

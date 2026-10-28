@@ -1,10 +1,9 @@
 // ============================================================
 // FICHIER : lib/pdf/chronologie_pdf.dart
-// Générateur PDF SSC1 — Liste + Fiche
+// Version tableau — ID aligné à droite, colonnes vides pour espacement
 // ============================================================
 
 import 'dart:typed_data';
-import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:flutter/services.dart' show rootBundle;
@@ -17,26 +16,12 @@ class ChronologiePdf {
   }) async {
     final pdf = pw.Document();
 
-    // ⭐ Charger police Unicode Roboto depuis assets
     final roboto = pw.Font.ttf(
       await rootBundle.load("assets/fonts/Roboto-Regular.ttf"),
     );
     final robotoBold = pw.Font.ttf(
       await rootBundle.load("assets/fonts/Roboto-Bold.ttf"),
     );
-
-    final dateFormat = DateFormat("dd-MM-yyyy");
-
-    // ⭐ Parseur dd-mm-yyyy
-    DateTime _parseDDMMYYYY(String s) {
-      if (s.isEmpty) return DateTime(1);
-      final parts = s.split('-');
-      return DateTime(
-        int.parse(parts[2]), // année
-        int.parse(parts[1]), // mois
-        int.parse(parts[0]), // jour
-      );
-    }
 
     pdf.addPage(
       pw.MultiPage(
@@ -46,7 +31,7 @@ class ChronologiePdf {
           pw.Text(
             titre,
             style: pw.TextStyle(
-              fontSize: 20,
+              fontSize: 18, // 🔧 réduit
               fontWeight: pw.FontWeight.bold,
               font: robotoBold,
             ),
@@ -57,7 +42,7 @@ class ChronologiePdf {
             pw.Text(
               "Critère : $critere",
               style: pw.TextStyle(
-                fontSize: 14,
+                fontSize: 12, // 🔧 réduit
                 fontWeight: pw.FontWeight.bold,
                 font: robotoBold,
               ),
@@ -68,49 +53,55 @@ class ChronologiePdf {
 
           pw.Table(
             border: null,
+
+            // ⭐⭐⭐ Colonnes avec séparateurs vides ⭐⭐⭐
             columnWidths: {
-              0: pw.FixedColumnWidth(60), // ID aligné à droite
-              1: pw.FixedColumnWidth(80), // Début
-              2: pw.FixedColumnWidth(80), // Fin
-              3: pw.FixedColumnWidth(50), // Type
-              4: pw.FlexColumnWidth(), // Nom
+              0: pw.FixedColumnWidth(35), // ID 45
+              1: pw.FixedColumnWidth(10), // espace
+              2: pw.FixedColumnWidth(70), // Début
+              3: pw.FixedColumnWidth(5), // espace
+              4: pw.FixedColumnWidth(70), // Fin
+              5: pw.FixedColumnWidth(5), // espace
+              6: pw.FixedColumnWidth(50), // Type
+              7: pw.FixedColumnWidth(5), // espace
+              8: pw.FlexColumnWidth(), // Nom
             },
+
             children: [
               pw.TableRow(
                 children: [
                   _header("ID", robotoBold),
+                  pw.Text(""),
                   _header("Début", robotoBold),
+                  pw.Text(""),
                   _header("Fin", robotoBold),
+                  pw.Text(""),
                   _header("Type", robotoBold),
+                  pw.Text(""),
                   _header("Nom", robotoBold),
                 ],
               ),
 
               ...data.map((e) {
+                final id = e["id"];
+                final idStr = id == null ? "" : id.toString().padLeft(4, ' ');
+
                 final debut = e["debut"] ?? "";
                 final fin = e["fin"] ?? "";
-                final id = e["id"];
-
-                final idStr = id == null ? "" : id.toString().padLeft(4, ' ');
+                final type = e["type"] ?? "";
+                final nom = e["nom"] ?? "";
 
                 return pw.TableRow(
                   children: [
                     _cell(idStr, roboto, alignRight: true),
-
-                    _cell(
-                      debut.isEmpty
-                          ? ""
-                          : dateFormat.format(_parseDDMMYYYY(debut)),
-                      roboto,
-                    ),
-
-                    _cell(
-                      fin.isEmpty ? "" : dateFormat.format(_parseDDMMYYYY(fin)),
-                      roboto,
-                    ),
-
-                    _cell(e["type"] ?? "", roboto),
-                    _cell(e["nom"] ?? "", roboto),
+                    pw.Text(""),
+                    _cell(debut, roboto),
+                    pw.Text(""),
+                    _cell(fin, roboto),
+                    pw.Text(""),
+                    _cell(type, roboto),
+                    pw.Text(""),
+                    _cell(nom, roboto),
                   ],
                 );
               }).toList(),
@@ -123,23 +114,32 @@ class ChronologiePdf {
     return pdf.save();
   }
 
+  // ⭐⭐⭐ En‑têtes réduits (11 pt)
   static pw.Widget _header(String text, pw.Font font) {
     return pw.Padding(
       padding: const pw.EdgeInsets.symmetric(vertical: 4),
       child: pw.Text(
         text,
-        style: pw.TextStyle(fontWeight: pw.FontWeight.bold, font: font),
+        style: pw.TextStyle(
+          fontWeight: pw.FontWeight.bold,
+          font: font,
+          fontSize: 11, // 🔧 réduit
+        ),
       ),
     );
   }
 
+  // ⭐⭐⭐ Contenu réduit (9 pt)
   static pw.Widget _cell(String text, pw.Font font, {bool alignRight = false}) {
     return pw.Padding(
       padding: const pw.EdgeInsets.symmetric(vertical: 3),
       child: pw.Text(
         text,
         textAlign: alignRight ? pw.TextAlign.right : pw.TextAlign.left,
-        style: pw.TextStyle(font: font),
+        style: pw.TextStyle(
+          font: font,
+          fontSize: 9, // 🔧 réduit
+        ),
       ),
     );
   }

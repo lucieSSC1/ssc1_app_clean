@@ -1,111 +1,290 @@
-// lib/services/document_service.dart
+// ============================================================
+// FICHIER : lib/services/document_service.dart
+// Service Document — Version SSC1
+// ============================================================
 
-import 'dart:convert';
-import 'dart:io';
-import 'package:file_picker/file_picker.dart';
-import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../models/document.dart';
-import 'api_service.dart';
+import '../models/document_model.dart';
+import '../models/global_info_model.dart';
+import 'global_info_service.dart';
 
 class DocumentService {
-  // ============================
-  //  GET /document
-  // ============================
-  Future<List<DocumentSSC1>> getAll() async {
-    final response = await ApiService.get("/document");
+  final supabase = Supabase.instance.client;
 
-    return (response as List)
-        .map((json) => DocumentSSC1.fromJson(json))
+  final _globService = GlobalInfoService();
+
+  void _debug(String msg, [dynamic data]) {
+    print("DEBUG-DOC-SERVICE: $msg");
+
+    if (data != null) {
+      print("DEBUG-DATA: $data");
+    }
+  }
+
+  // ------------------------------------------------------------
+  // LISTER TOUS LES DOCUMENTS
+  // ------------------------------------------------------------
+  Future<List<DocumentModel>> getAllDocuments() async {
+    _debug("getAllDocuments()");
+
+    final data = await supabase.from('document').select('*').order('id');
+
+    return (data as List)
+        .map((e) => DocumentModel.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
-  // ============================
-  //  GET /document/{id}
-  // ============================
-  Future<DocumentSSC1?> get(int id) async {
-    final response = await ApiService.get("/document/$id");
-    return DocumentSSC1.fromJson(response);
+  // ------------------------------------------------------------
+  // OBTENIR PAR ID
+  // ------------------------------------------------------------
+  Future<DocumentModel?> getDocumentById(int id) async {
+    _debug("getDocumentById($id)");
+
+    final data = await supabase
+        .from('document')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+    if (data == null) return null;
+
+    return DocumentModel.fromJson(data as Map<String, dynamic>);
   }
 
-  // ============================
-  //  POST /document
-  // ============================
-  Future<DocumentSSC1> create(DocumentSSC1 doc) async {
-    final response = await ApiService.post("/document", doc.toJson());
-    return DocumentSSC1.fromJson(response);
-  }
+  // ------------------------------------------------------------
+  // CRÉER
+  // ------------------------------------------------------------
+  Future<DocumentModel> createDocument(DocumentModel doc) async {
+    _debug("createDocument()", {
+      'glob_id': doc.globId,
+      'date_saisie': doc.dateSaisie?.toIso8601String(),
+      'titre': doc.titre,
+      'mot_cle1': doc.motCle1,
+      'mot_cle2': doc.motCle2,
+      'mot_cle3': doc.motCle3,
+      'chronique_url': doc.chroniqueUrl,
+      'rem': doc.rem,
+    });
 
-  // ============================
-  //  PUT /document/{id}
-  // ============================
-  Future<DocumentSSC1> update(DocumentSSC1 doc) async {
-    final response = await ApiService.put("/document/${doc.id}", doc.toJson());
-    return DocumentSSC1.fromJson(response);
-  }
+    final response = await supabase
+        .from('document')
+        .insert({
+          'glob_id': doc.globId,
+          'date_saisie': doc.dateSaisie?.toIso8601String(),
+          'titre': doc.titre,
+          'mot_cle1': doc.motCle1,
+          'mot_cle2': doc.motCle2,
+          'mot_cle3': doc.motCle3,
+          'chronique_url': doc.chroniqueUrl,
+          'rem': doc.rem,
+        })
+        .select('*')
+        .maybeSingle();
 
-  // ============================
-  //  DELETE /document/{id}
-  // ============================
-  Future<void> delete(int id) async {
-    await ApiService.delete("/document/$id");
-  }
-
-  // ============================
-  //  POST /document/recherche
-  // ============================
-  Future<List<DocumentSSC1>> search(
-    String titre,
-    String mot1,
-    String mot2,
-    String mot3,
-    String mode,
-  ) async {
-    final data = {
-      "titre": titre,
-      "mot_cle1": mot1,
-      "mot_cle2": mot2,
-      "mot_cle3": mot3,
-      "mode": mode,
-    };
-
-    final response = await ApiService.post("/document/recherche", data);
-
-    return (response as List)
-        .map((json) => DocumentSSC1.fromJson(json))
-        .toList();
-  }
-
-  // ============================
-  //  Upload fichier (local ? URL)
-  // ============================
-  Future<String?> uploadFile() async {
-    // S�lection du fichier
-    final result = await FilePicker.platform.pickFiles();
-
-    if (result == null) return null;
-
-    final file = File(result.files.single.path!);
-    final fileName = result.files.single.name;
-
-    // Envoi vers ton backend (ou Supabase plus tard)
-    final request = http.MultipartRequest(
-      "POST",
-      Uri.parse("${ApiService.baseUrl}/upload"),
-    );
-
-    request.files.add(
-      await http.MultipartFile.fromPath("file", file.path, filename: fileName),
-    );
-
-    final streamed = await request.send();
-    final response = await http.Response.fromStream(streamed);
-
-    if (response.statusCode == 200) {
-      final json = jsonDecode(response.body);
-      return json["url"]; // URL du fichier
+    if (response == null) {
+      throw Exception("Erreur création document : réponse vide");
     }
 
-    return null;
+    return DocumentModel.fromJson(response as Map<String, dynamic>);
+  }
+
+  // ------------------------------------------------------------
+  // MODIFIER
+  // ------------------------------------------------------------
+  Future<DocumentModel> updateDocument(DocumentModel doc) async {
+    if (doc.id == null) return doc;
+
+    _debug("updateDocument(${doc.id})");
+
+    await supabase
+        .from('document')
+        .update({
+          'glob_id': doc.globId,
+          'date_saisie': doc.dateSaisie?.toIso8601String(),
+          'titre': doc.titre,
+          'mot_cle1': doc.motCle1,
+          'mot_cle2': doc.motCle2,
+          'mot_cle3': doc.motCle3,
+          'chronique_url': doc.chroniqueUrl,
+          'rem': doc.rem,
+        })
+        .eq('id', doc.id!);
+
+    final data = await supabase
+        .from('document')
+        .select('*')
+        .eq('id', doc.id!)
+        .maybeSingle();
+
+    if (data == null) {
+      throw Exception("Erreur update document : GET après update vide");
+    }
+
+    return DocumentModel.fromJson(data as Map<String, dynamic>);
+  }
+
+  // ------------------------------------------------------------
+  // SUPPRIMER
+  // ------------------------------------------------------------
+  Future<void> deleteDocument(int id) async {
+    _debug("deleteDocument($id)");
+
+    final doc = await getDocumentById(id);
+
+    if (doc == null) return;
+
+    final globId = doc.globId;
+
+    await supabase.from('document').delete().eq('id', id);
+
+    if (globId != null) {
+      await supabase.from('glob_info').delete().eq('id', globId);
+
+      _debug("glob_info supprimé", globId);
+    }
+  }
+
+  // ------------------------------------------------------------
+  // RECHERCHE PAR TITRE
+  // ------------------------------------------------------------
+  Future<List<DocumentModel>> searchDocumentsByTitre(String titre) async {
+    _debug("searchDocumentsByTitre('$titre')");
+
+    if (titre.trim().isEmpty) return [];
+
+    final clean = _normalize(titre.trim());
+
+    final data = await supabase.from('document').select('*').order('id');
+
+    final all = (data as List)
+        .map((e) => DocumentModel.fromJson(e as Map<String, dynamic>))
+        .toList();
+
+    final filtered = all.where((doc) {
+      return _normalize(doc.titre).contains(clean);
+    }).toList();
+
+    await _sortByDebut(filtered);
+
+    return filtered;
+  }
+
+  // ------------------------------------------------------------
+  // RECHERCHE MOTS-CLÉS ET / OU
+  // ------------------------------------------------------------
+  Future<List<DocumentModel>> searchDocumentsByKeywordsEtOu(
+    String mc1,
+    String mc2,
+    String mc3,
+    bool modeEt,
+    bool rechercheExacte,
+  ) async {
+    final mcList = [
+      _normalize(mc1.trim()),
+      _normalize(mc2.trim()),
+      _normalize(mc3.trim()),
+    ].where((e) => e.isNotEmpty).toList();
+
+    if (mcList.isEmpty) return [];
+
+    final data = await supabase.from('document').select('*').order('id');
+
+    final all = (data as List)
+        .map((e) => DocumentModel.fromJson(e as Map<String, dynamic>))
+        .toList();
+
+    bool compare(String base, String mc) {
+      final b = _normalize(base);
+
+      return rechercheExacte ? b == mc : b.contains(mc);
+    }
+
+    List<DocumentModel> filtered;
+
+    if (!modeEt) {
+      filtered = all.where((doc) {
+        return mcList.any(
+          (mc) =>
+              compare(doc.motCle1 ?? "", mc) ||
+              compare(doc.motCle2 ?? "", mc) ||
+              compare(doc.motCle3 ?? "", mc),
+        );
+      }).toList();
+    } else {
+      filtered = all.where((doc) {
+        return mcList.every(
+          (mc) =>
+              compare(doc.motCle1 ?? "", mc) ||
+              compare(doc.motCle2 ?? "", mc) ||
+              compare(doc.motCle3 ?? "", mc),
+        );
+      }).toList();
+    }
+
+    await _sortByDebut(filtered);
+
+    return filtered;
+  }
+
+  // ------------------------------------------------------------
+  // TRI CHRONOLOGIQUE SUR glob_info.debut
+  // ------------------------------------------------------------
+  Future<void> _sortByDebut(List<DocumentModel> liste) async {
+    final map = <int, DateTime?>{};
+
+    for (var doc in liste) {
+      if (doc.globId != null) {
+        final info = await _globService.getById(doc.globId!);
+
+        map[doc.id!] = info?.debut;
+      } else {
+        map[doc.id!] = null;
+      }
+    }
+
+    liste.sort((a, b) {
+      final da = map[a.id] ?? DateTime(1900);
+
+      final db = map[b.id] ?? DateTime(1900);
+
+      return da.compareTo(db);
+    });
+  }
+
+  // ------------------------------------------------------------
+  // NORMALISATION
+  // ------------------------------------------------------------
+  String _normalize(String s) {
+    final map = {
+      'à': 'a',
+      'â': 'a',
+      'ä': 'a',
+      'á': 'a',
+      'ã': 'a',
+      'å': 'a',
+      'ç': 'c',
+      'è': 'e',
+      'é': 'e',
+      'ê': 'e',
+      'ë': 'e',
+      'ì': 'i',
+      'í': 'i',
+      'î': 'i',
+      'ï': 'i',
+      'ò': 'o',
+      'ó': 'o',
+      'ô': 'o',
+      'ö': 'o',
+      'õ': 'o',
+      'ù': 'u',
+      'ú': 'u',
+      'û': 'u',
+      'ü': 'u',
+      'ý': 'y',
+      'ÿ': 'y',
+    };
+
+    return s.toLowerCase().split('').map((c) => map[c] ?? c).join();
   }
 }

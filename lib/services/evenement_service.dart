@@ -5,9 +5,12 @@
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/evenement_model.dart';
+import '../models/global_info_model.dart';
+import 'global_info_service.dart';
 
 class EvenementService {
   final supabase = Supabase.instance.client;
+  final _globService = GlobalInfoService();
 
   void _debug(String msg, [dynamic data]) {
     print("DEBUG-SERVICE: $msg");
@@ -133,7 +136,7 @@ class EvenementService {
   }
 
   // ------------------------------------------------------------
-  // RECHERCHE PAR TITRE
+  // RECHERCHE PAR TITRE — TRI CHRONOLOGIQUE SUR début
   // ------------------------------------------------------------
   Future<List<EvenementModel>> searchEvenementsByTitre(String nom) async {
     _debug("searchEvenementsByTitre('$nom')");
@@ -148,14 +151,19 @@ class EvenementService {
         .map((e) => EvenementModel.fromMap(e as Map<String, dynamic>))
         .toList();
 
-    return all.where((evt) {
+    final filtered = all.where((evt) {
       final evtNom = _normalize(evt.nom);
       return evtNom.contains(clean);
     }).toList();
+
+    // ⭐ TRI CHRONOLOGIQUE SUR début
+    await _sortByDebut(filtered);
+
+    return filtered;
   }
 
   // ------------------------------------------------------------
-  // RECHERCHE PAR CATÉGORIE
+  // RECHERCHE PAR CATÉGORIE — TRI CHRONOLOGIQUE SUR début
   // ------------------------------------------------------------
   Future<List<EvenementModel>> searchEvenementsByCategorie(int cat) async {
     _debug("searchEvenementsByCategorie($cat)");
@@ -166,13 +174,18 @@ class EvenementService {
         .eq('categorie', cat)
         .order('id');
 
-    return (data as List)
+    final liste = (data as List)
         .map((e) => EvenementModel.fromMap(e as Map<String, dynamic>))
         .toList();
+
+    // ⭐ TRI CHRONOLOGIQUE SUR début
+    await _sortByDebut(liste);
+
+    return liste;
   }
 
   // ------------------------------------------------------------
-  // RECHERCHE PAR MOTS-CLÉS — MODE ET / OU
+  // RECHERCHE PAR MOTS-CLÉS — TRI CHRONOLOGIQUE SUR début
   // ------------------------------------------------------------
   Future<List<EvenementModel>> searchEvenementsByKeywordsEtOu(
     String mc1,
@@ -208,8 +221,10 @@ class EvenementService {
       return rechercheExacte ? b == mc : b.contains(mc);
     }
 
+    List<EvenementModel> filtered;
+
     if (!modeEt) {
-      return all.where((evt) {
+      filtered = all.where((evt) {
         return mcList.any(
           (mc) =>
               compare(evt.motCle1 ?? "", mc) ||
@@ -218,7 +233,7 @@ class EvenementService {
         );
       }).toList();
     } else {
-      return all.where((evt) {
+      filtered = all.where((evt) {
         return mcList.every(
           (mc) =>
               compare(evt.motCle1 ?? "", mc) ||
@@ -227,6 +242,33 @@ class EvenementService {
         );
       }).toList();
     }
+
+    // ⭐ TRI CHRONOLOGIQUE SUR début
+    await _sortByDebut(filtered);
+
+    return filtered;
+  }
+
+  // ------------------------------------------------------------
+  // TRI CHRONOLOGIQUE SUR début (glob_info)
+  // ------------------------------------------------------------
+  Future<void> _sortByDebut(List<EvenementModel> liste) async {
+    final map = <int, DateTime?>{};
+
+    for (var evt in liste) {
+      if (evt.globId != null) {
+        final info = await _globService.getById(evt.globId!);
+        map[evt.id!] = info?.debut;
+      } else {
+        map[evt.id!] = null;
+      }
+    }
+
+    liste.sort((a, b) {
+      final da = map[a.id] ?? DateTime(1900);
+      final db = map[b.id] ?? DateTime(1900);
+      return da.compareTo(db);
+    });
   }
 
   // ------------------------------------------------------------

@@ -1,12 +1,12 @@
 // lib/screens/home/home_screen.dart
 //
-// �cran principal de SSC1.
+// Écran principal de SSC1.
 // Affiche les 6 modules sous forme d�onglets :
 // 1. Biographie
-// 2. �tudes et Emploi
+// 2. Études et Emploi
 // 3. Loisirs
 // 4. Gestionnaire de projet
-// 5. G�n�rateur de chronologie
+// 5. Générateur de chronologie
 // 6. Gestionnaire de documents
 
 import 'package:flutter/material.dart';
@@ -51,10 +51,10 @@ class HomeScreen extends StatelessWidget {
             isScrollable: true,
             tabs: [
               Tab(text: 'Biographie'),
-              Tab(text: '�tudes et emploi'),
+              Tab(text: 'Études et emploi'),
               Tab(text: 'Loisirs'),
               Tab(text: 'Gestionnaire de projet'),
-              Tab(text: 'G�n�rateur de chronologie'),
+              Tab(text: 'Générateur de chronologie'),
               Tab(text: 'Gestionnaire de documents'),
             ],
           ),

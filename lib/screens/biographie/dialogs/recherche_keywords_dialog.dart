@@ -1,6 +1,6 @@
 // ============================================================
 // FICHIER : recherche_keywords_dialog.dart
-// Version SSC1 — ET/OU + Recherche exacte/partielle
+// Version SSC1 — ET/OU + Recherche exacte/partielle (NON‑dismissible)
 // ============================================================
 
 import 'package:flutter/material.dart';
@@ -23,9 +23,6 @@ class _RechercheKeywordsDialogState extends State<RechercheKeywordsDialog> {
   bool _modeEt = false; // false = OU(*), true = ET( )
   bool _rechercheExacte = false; // false = partielle(*), true = exacte( )
 
-  // ------------------------------------------------------------
-  // NORMALISATION
-  // ------------------------------------------------------------
   String _normalize(String s) {
     s = s.trim();
     s = s.replaceAll('’', "'");
@@ -65,9 +62,6 @@ class _RechercheKeywordsDialogState extends State<RechercheKeywordsDialog> {
     return s;
   }
 
-  // ------------------------------------------------------------
-  // VALIDATION + APPEL SERVICE
-  // ------------------------------------------------------------
   Future<void> _valider() async {
     String mc1 = _normalize(_mc1.text);
     String mc2 = _normalize(_mc2.text);
@@ -76,6 +70,7 @@ class _RechercheKeywordsDialogState extends State<RechercheKeywordsDialog> {
     if (mc1.isEmpty && mc2.isEmpty && mc3.isEmpty) {
       await showDialog(
         context: context,
+        barrierDismissible: false, // ⭐ Correction
         builder: (_) => AlertDialog(
           title: const Text("Recherche"),
           content: const Text("Entrer au moins un mot‑clé."),
@@ -99,7 +94,7 @@ class _RechercheKeywordsDialogState extends State<RechercheKeywordsDialog> {
     return Dialog(
       child: SizedBox(
         width: 300,
-        height: 360, // ⭐ Augmenté pour afficher tous les boutons
+        height: 360,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -145,7 +140,6 @@ class _RechercheKeywordsDialogState extends State<RechercheKeywordsDialog> {
 
                     const SizedBox(height: 12),
 
-                    // ⭐ ET( )   OU(*)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -167,7 +161,6 @@ class _RechercheKeywordsDialogState extends State<RechercheKeywordsDialog> {
 
                     const SizedBox(height: 12),
 
-                    // ⭐ Recherche exacte( )   Recherche partielle(*)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [

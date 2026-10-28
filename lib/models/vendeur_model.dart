@@ -1,5 +1,3 @@
-// lib/models/vendeur_model.dart
-
 class Vendeur {
   final int? id;
   final String nom;
@@ -45,7 +43,7 @@ class Vendeur {
 
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
+      // ⚠️ id retiré pour éviter l’erreur 23502
       'nom': nom,
       'adresse': adresse,
       'ville': ville,

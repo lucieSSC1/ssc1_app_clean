@@ -1,6 +1,6 @@
 // ============================================================
 // FICHIER : lib/screens/biographie/dialogs/recherche_titre_dialog.dart
-// Fenêtre compacte SSC1 — Recherche par titre
+// Fenêtre compacte SSC1 — Recherche par titre (NON‑dismissible)
 // ============================================================
 
 import 'package:flutter/material.dart';
@@ -21,27 +21,25 @@ class _RechercheTitreDialogState extends State<RechercheTitreDialog> {
     final titre = _ctrl.text.trim();
 
     if (titre.isEmpty) {
-      // ⭐ Popup d’erreur — NE FERME PAS la fenêtre
       await showDialog(
         context: context,
+        barrierDismissible: false, // ⭐ Correction
         builder: (_) => AlertDialog(
           title: const Text("Recherche"),
           content: const Text("Entrer un titre."),
           actions: [
             TextButton(
               child: const Text("OK"),
-              onPressed: () =>
-                  Navigator.pop(context), // ferme le popup seulement
+              onPressed: () => Navigator.pop(context),
             ),
           ],
         ),
       );
-      return; // ⭐ Retourne dans la fenêtre de recherche
+      return;
     }
 
-    // ⭐ Champ valide → lancer la recherche
     widget.onSearch(titre);
-    Navigator.pop(context); // ferme la fenêtre de recherche
+    Navigator.pop(context);
   }
 
   @override
@@ -72,13 +70,10 @@ class _RechercheTitreDialogState extends State<RechercheTitreDialog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // ⭐ RECHERCHER (à gauche)
                   ElevatedButton(
                     child: const Text("Rechercher"),
                     onPressed: _valider,
                   ),
-
-                  // ⭐ ANNULER (à droite)
                   ElevatedButton(
                     child: const Text("Annuler"),
                     onPressed: () => Navigator.pop(context),

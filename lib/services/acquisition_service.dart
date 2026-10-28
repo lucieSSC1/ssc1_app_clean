@@ -1,108 +1,190 @@
 // ssc1_app/lib/services/acquisition_service.dart
 //
 // Service : Acquisition (version SSC1)
-// -------------------------------------
-// Modernisation compl�te du fichier api_acquisition.dart de structure 2.
-// - Classe non statique
-// - M�thodes propres et coh�rentes
-// - Compatible avec acquisition_model.dart
-// - Compatible avec structure 4
-// - Compatible avec les sp�cifications fonctionnelles
+// ------------------------------------
+// CRUD complet + recherche par titre + tri chronologique via glob_info
+// Table acquisition : id, glob_id, nom, description, vendeur_id, garantie,
+// expire, prix, commentaire, image, facture
+// Table glob_info : id, debut, fin, type
+// ----------------------------------------------
 
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/acquisition_model.dart';
+import '../models/global_info_model.dart';
+import 'global_info_service.dart';
 
 class AcquisitionService {
-  // IMPORTANT : l'adresse doit �tre adapt�e selon ton r�seau
-  final String baseUrl = "http://192.168.0.12:7000/api/acquisition";
+  final supabase = Supabase.instance.client;
+  final _globService = GlobalInfoService();
 
-  // ------------------------------------------------------------
-  // GET ALL
-  // ------------------------------------------------------------
-  Future<List<Acquisition>> getAll() async {
-    final response = await http.get(Uri.parse(baseUrl));
-
-    if (response.statusCode == 200) {
-      final List<dynamic> jsonList = jsonDecode(response.body);
-      return jsonList.map((j) => Acquisition.fromJson(j)).toList();
-    }
-
-    throw Exception(
-      "Erreur chargement acquisitions (code ${response.statusCode})",
-    );
+  void _debug(String msg, [dynamic data]) {
+    print("DEBUG-ACQ-SERVICE: $msg");
+    if (data != null) print("DEBUG-DATA: $data");
   }
 
   // ------------------------------------------------------------
-  // GET BY ID
+  // LISTER TOUTES LES ACQUISITIONS
   // ------------------------------------------------------------
-  Future<Acquisition?> getById(int id) async {
-    final response = await http.get(Uri.parse("$baseUrl/$id"));
+  Future<List<AcquisitionModel>> getAllAcquisitions() async {
+    _debug("getAllAcquisitions()");
 
-    if (response.statusCode == 200) {
-      return Acquisition.fromJson(jsonDecode(response.body));
-    }
+    final data = await supabase.from('acquisition').select('*').order('id');
 
-    if (response.statusCode == 404) {
-      return null;
-    }
-
-    throw Exception(
-      "Erreur chargement acquisition (code ${response.statusCode})",
-    );
+    return (data as List)
+        .map((e) => AcquisitionModel.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   // ------------------------------------------------------------
-  // CREATE
+  // OBTENIR PAR ID
   // ------------------------------------------------------------
-  Future<Acquisition> create(Acquisition acquisition) async {
-    final response = await http.post(
-      Uri.parse(baseUrl),
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode(acquisition.toJson()),
-    );
+  Future<AcquisitionModel?> getAcquisitionById(int id) async {
+    _debug("getAcquisitionById($id)");
 
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      return Acquisition.fromJson(jsonDecode(response.body));
-    }
+    final data = await supabase
+        .from('acquisition')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
 
-    throw Exception(
-      "Erreur cr�ation acquisition (code ${response.statusCode})\n${response.body}",
-    );
+    if (data == null) return null;
+
+    return AcquisitionModel.fromJson(data as Map<String, dynamic>);
   }
 
   // ------------------------------------------------------------
-  // UPDATE
+  // CRÉER
   // ------------------------------------------------------------
-  Future<void> update(Acquisition acquisition) async {
-    if (acquisition.id == null) {
-      throw Exception("Impossible de mettre � jour : id manquant");
+  Future<AcquisitionModel> createAcquisition(AcquisitionModel a) async {
+    _debug("createAcquisition()", a.toJson());
+
+    final response = await supabase
+        .from('acquisition')
+        .insert(a.toJson())
+        .select('*')
+        .maybeSingle();
+
+    if (response == null) {
+      throw Exception("Erreur création acquisition : réponse vide");
     }
 
-    final response = await http.put(
-      Uri.parse("$baseUrl/${acquisition.id}"),
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode(acquisition.toJson()),
-    );
+    return AcquisitionModel.fromJson(response as Map<String, dynamic>);
+  }
 
-    if (response.statusCode != 204) {
-      throw Exception(
-        "Erreur mise � jour acquisition (code ${response.statusCode})\n${response.body}",
-      );
+  // ------------------------------------------------------------
+  // METTRE À JOUR
+  // ------------------------------------------------------------
+  Future<AcquisitionModel> updateAcquisition(AcquisitionModel a) async {
+    if (a.id == null) return a;
+
+    _debug("updateAcquisition(${a.id})");
+
+    await supabase.from('acquisition').update(a.toJson()).eq('id', a.id!);
+
+    final data = await supabase
+        .from('acquisition')
+        .select('*')
+        .eq('id', a.id!)
+        .maybeSingle();
+
+    if (data == null) {
+      throw Exception("Erreur update acquisition : GET après update vide");
+    }
+
+    return AcquisitionModel.fromJson(data as Map<String, dynamic>);
+  }
+
+  // ------------------------------------------------------------
+  // SUPPRIMER + CASCADE glob_info
+  // ------------------------------------------------------------
+  Future<void> deleteAcquisition(int id) async {
+    _debug("deleteAcquisition($id)");
+
+    final acq = await getAcquisitionById(id);
+    if (acq == null) return;
+
+    final globId = acq.globId;
+
+    await supabase.from('acquisition').delete().eq('id', id);
+
+    if (globId != null) {
+      await supabase.from('glob_info').delete().eq('id', globId);
+      _debug("glob_info supprimé", globId);
     }
   }
 
   // ------------------------------------------------------------
-  // DELETE
+  // RECHERCHE PAR TITRE + TRI CHRONOLOGIQUE
   // ------------------------------------------------------------
-  Future<void> delete(int id) async {
-    final response = await http.delete(Uri.parse("$baseUrl/$id"));
+  Future<List<AcquisitionModel>> searchAcquisitionsByTitre(String nom) async {
+    _debug("searchAcquisitionsByTitre('$nom')");
 
-    if (response.statusCode != 204) {
-      throw Exception(
-        "Erreur suppression acquisition (code ${response.statusCode})",
-      );
+    if (nom.trim().isEmpty) return [];
+
+    final clean = _normalize(nom.trim());
+
+    final data = await supabase.from('acquisition').select('*').order('id');
+
+    final all = (data as List)
+        .map((e) => AcquisitionModel.fromJson(e as Map<String, dynamic>))
+        .toList();
+
+    final filtered = all.where((acq) {
+      final acqNom = _normalize(acq.nom);
+      return acqNom.contains(clean);
+    }).toList();
+
+    await _sortByDebut(filtered);
+
+    return filtered;
+  }
+
+  // ------------------------------------------------------------
+  // TRI CHRONOLOGIQUE via glob_info
+  // ------------------------------------------------------------
+  Future<void> _sortByDebut(List<AcquisitionModel> liste) async {
+    final map = <int, DateTime?>{};
+
+    for (var acq in liste) {
+      if (acq.globId != null) {
+        final info = await _globService.getById(acq.globId!);
+        map[acq.id!] = info?.debut;
+      } else {
+        map[acq.id!] = null;
+      }
     }
+
+    liste.sort((a, b) {
+      final da = map[a.id] ?? DateTime(1900);
+      final db = map[b.id] ?? DateTime(1900);
+      return da.compareTo(db);
+    });
+  }
+
+  // ------------------------------------------------------------
+  // NORMALISATION
+  // ------------------------------------------------------------
+  String _normalize(String s) {
+    final map = {
+      'à': 'a',
+      'â': 'a',
+      'ä': 'a',
+      'ç': 'c',
+      'é': 'e',
+      'è': 'e',
+      'ê': 'e',
+      'ë': 'e',
+      'î': 'i',
+      'ï': 'i',
+      'ô': 'o',
+      'ö': 'o',
+      'ù': 'u',
+      'û': 'u',
+      'ü': 'u',
+      'ÿ': 'y',
+    };
+
+    return s.toLowerCase().split('').map((c) => map[c] ?? c).join();
   }
 }

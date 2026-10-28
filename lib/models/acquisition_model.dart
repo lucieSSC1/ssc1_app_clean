@@ -1,26 +1,6 @@
-// ssc1_app/lib/models/acquisition_model.dart
-//
-// Mod�le : Acquisition (version SSC1)
-// ------------------------------------
-// Repr�sente une acquisition personnelle dans le module Biographie.
-// Champs h�rit�s de structure 2, modernis�s et normalis�s.
-//
-// Champs :
-// - id
-// - globId (r�f�rence vers GlobalInfo)
-// - nom
-// - description
-// - vendeurId
-// - garantie
-// - expire
-// - prix
-// - commentaire
-// - image
-// - facture
-
-class Acquisition {
-  final int? id;
-  final int? globId;
+class AcquisitionModel {
+  final int? id; // PK auto-généré
+  final int? globId; // FK vers glob_info.id
   final String nom;
   final String? description;
   final int? vendeurId;
@@ -31,7 +11,7 @@ class Acquisition {
   final String? image;
   final String? facture;
 
-  Acquisition({
+  AcquisitionModel({
     this.id,
     this.globId,
     required this.nom,
@@ -45,10 +25,10 @@ class Acquisition {
     this.facture,
   });
 
-  factory Acquisition.fromJson(Map<String, dynamic> json) {
-    return Acquisition(
+  factory AcquisitionModel.fromJson(Map<String, dynamic> json) {
+    return AcquisitionModel(
       id: json['id'],
-      globId: json['globId'],
+      globId: json['glob_id'],
       nom: json['nom'] ?? "",
       description: json['description'],
       vendeurId: json['vendeur_id'],
@@ -63,8 +43,7 @@ class Acquisition {
 
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
-      'globId': globId,
+      'glob_id': globId,
       'nom': nom,
       'description': description,
       'vendeur_id': vendeurId,
