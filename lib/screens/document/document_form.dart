@@ -111,6 +111,10 @@ class _DocumentFormState extends State<DocumentForm> {
       errors['motcle'] = "Au moins un mot-clé requis";
     }
 
+    if (_chroniqueCtrl.text.trim().isEmpty) {
+      errors['chronique'] = "Chronique obligatoire";
+    }
+
     if (_debut != null && _fin != null && _fin!.isBefore(_debut!)) {
       errors['dates'] = "Fin doit être égale ou ultérieure à début";
     }
@@ -401,6 +405,9 @@ class _DocumentFormState extends State<DocumentForm> {
 
                     TextField(
                       controller: _titreCtrl,
+                      onChanged: (_) {
+                        if (_showErrors) setState(() {});
+                      },
                       decoration: InputDecoration(
                         labelText: "Titre",
                         errorText: errors['titre'],
@@ -409,6 +416,9 @@ class _DocumentFormState extends State<DocumentForm> {
 
                     TextField(
                       controller: _mc1Ctrl,
+                      onChanged: (_) {
+                        if (_showErrors) setState(() {});
+                      },
                       decoration: InputDecoration(
                         labelText: "Mot clé 1",
                         errorText: errors['motcle'],
@@ -417,11 +427,17 @@ class _DocumentFormState extends State<DocumentForm> {
 
                     TextField(
                       controller: _mc2Ctrl,
+                      onChanged: (_) {
+                        if (_showErrors) setState(() {});
+                      },
                       decoration: const InputDecoration(labelText: "Mot clé 2"),
                     ),
 
                     TextField(
                       controller: _mc3Ctrl,
+                      onChanged: (_) {
+                        if (_showErrors) setState(() {});
+                      },
                       decoration: const InputDecoration(labelText: "Mot clé 3"),
                     ),
 
@@ -451,24 +467,18 @@ class _DocumentFormState extends State<DocumentForm> {
                             }
                           },
                         ),
-
-                        IconButton(
-                          icon: const Icon(Icons.open_in_new),
-                          tooltip: "Ouvrir",
-                          onPressed: _ouvrirChronique,
-                        ),
-
-                        IconButton(
-                          icon: const Icon(Icons.save_alt),
-                          tooltip: "Sauvegarder",
-                          onPressed: _sauvegarderChronique,
-                        ),
                       ],
                     ),
 
                     TextField(
                       controller: _chroniqueCtrl,
-                      decoration: const InputDecoration(labelText: "Chronique"),
+                      onChanged: (_) {
+                        if (_showErrors) setState(() {});
+                      },
+                      decoration: InputDecoration(
+                        labelText: "Chronique",
+                        errorText: errors['chronique'],
+                      ),
                     ),
 
                     TextField(

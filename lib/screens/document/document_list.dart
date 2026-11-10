@@ -11,8 +11,16 @@ import '../../models/global_info_model.dart';
 import '../../services/document_service.dart';
 import '../../services/global_info_service.dart';
 
+import '../biographie/dialogs/recherche_titre_dialog.dart';
+import '../biographie/dialogs/recherche_keywords_dialog.dart';
+
 import 'document_detail.dart';
 import 'document_form.dart';
+
+import 'package:printing/printing.dart';
+
+import '../../pdf/document_liste_pdf.dart';
+import '../../utils/pdf_saver.dart';
 
 class DocumentList extends StatefulWidget {
   const DocumentList({super.key});
@@ -35,6 +43,17 @@ class _DocumentListState extends State<DocumentList> {
   String? _critereActuel = "Tous";
 
   bool _loading = true;
+
+  String _modeRecherche = "Tous";
+
+  String _titreRecherche = "";
+
+  String _mc1Recherche = "";
+  String _mc2Recherche = "";
+  String _mc3Recherche = "";
+
+  bool _modeEtRecherche = false;
+  bool _rechercheExacte = false;
 
   @override
   void initState() {
@@ -91,6 +110,96 @@ class _DocumentListState extends State<DocumentList> {
         "${d.year}";
   }
 
+  Future<void> _genererPDFListe() async {
+    try {
+      final data = _currentList.map((doc) {
+        final info = _globMap[doc.globId];
+
+        return {
+          "id": doc.id,
+          "debut": _fmt(info?.debut),
+          "fin": _fmt(info?.fin),
+          "type": info?.type ?? "",
+          "titre": doc.titre,
+        };
+      }).toList();
+
+      final bytes = await DocumentListePdf.generate(
+        data,
+        "Liste des documents",
+        critere: _critereActuel,
+      );
+
+      final path = await savePdf(bytes: bytes, baseName: "ssc1_document");
+
+      _popup("PDF généré :\n$path");
+    } catch (e) {
+      _popup("Erreur PDF");
+    }
+  }
+
+  Future<void> _ouvrirPDFListe() async {
+    try {
+      final ok = await openSavedPdf();
+
+      if (!ok) {
+        _popup("Aucun PDF trouvé");
+      }
+    } catch (e) {
+      _popup("Erreur ouverture PDF");
+    }
+  }
+
+  Future<void> _imprimerPDF() async {
+    try {
+      final data = _currentList.map((doc) {
+        final info = _globMap[doc.globId];
+
+        return {
+          "id": doc.id,
+          "debut": _fmt(info?.debut),
+          "fin": _fmt(info?.fin),
+          "type": info?.type ?? "",
+          "titre": doc.titre,
+        };
+      }).toList();
+
+      final bytes = await DocumentListePdf.generate(
+        data,
+        "Liste des documents",
+        critere: _critereActuel,
+      );
+
+      await Printing.layoutPdf(onLayout: (_) => bytes);
+    } catch (e) {
+      _popup("Erreur impression");
+    }
+  }
+
+  Future<void> _rechargerCritereActuel() async {
+    switch (_modeRecherche) {
+      case "Titre":
+        _currentList = await _service.searchDocumentsByTitre(_titreRecherche);
+        break;
+
+      case "MotsCles":
+        _currentList = await _service.searchDocumentsByKeywordsEtOu(
+          _mc1Recherche,
+          _mc2Recherche,
+          _mc3Recherche,
+          _modeEtRecherche,
+          _rechercheExacte,
+        );
+        break;
+
+      default:
+        await _charger();
+        return;
+    }
+
+    setState(() {});
+  }
+
   Future<void> _searchById() async {
     final txt = _idCtrl.text.trim();
 
@@ -118,7 +227,7 @@ class _DocumentListState extends State<DocumentList> {
     );
 
     if (updated == true) {
-      await _charger();
+      await _rechargerCritereActuel();
     }
   }
 
@@ -153,9 +262,23 @@ class _DocumentListState extends State<DocumentList> {
           IconButton(
             tooltip: "Tout",
             icon: const Icon(Icons.refresh),
-            onPressed: () {
+            onPressed: () async {
               _idCtrl.clear();
-              _charger();
+
+              _modeRecherche = "Tous";
+
+              _titreRecherche = "";
+
+              _mc1Recherche = "";
+              _mc2Recherche = "";
+              _mc3Recherche = "";
+
+              _modeEtRecherche = false;
+              _rechercheExacte = false;
+
+              _critereActuel = "Tous";
+
+              await _charger();
             },
           ),
 
@@ -176,6 +299,97 @@ class _DocumentListState extends State<DocumentList> {
             tooltip: "Recherche ID",
             icon: const Icon(Icons.search),
             onPressed: _searchById,
+          ),
+
+          IconButton(
+            tooltip: "Recherche par titre",
+            icon: const Icon(Icons.title),
+            onPressed: () async {
+              await showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (_) => RechercheTitreDialog(
+                  onSearch: (titre) async {
+                    final liste = await _service.searchDocumentsByTitre(titre);
+
+                    if (liste.isEmpty) {
+                      _popup("Aucun resultat");
+                      return;
+                    }
+
+                    _currentList = liste;
+
+                    _modeRecherche = "Titre";
+                    _titreRecherche = titre;
+
+                    _critereActuel = "Titre contient $titre";
+
+                    setState(() {});
+                  },
+                ),
+              );
+            },
+          ),
+
+          IconButton(
+            tooltip: "Recherche mots-cles",
+            icon: const Icon(Icons.text_snippet),
+            onPressed: () async {
+              await showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (_) => RechercheKeywordsDialog(
+                  onSearch: (mc1, mc2, mc3, modeEt, rechercheExacte) async {
+                    final liste = await _service.searchDocumentsByKeywordsEtOu(
+                      mc1,
+                      mc2,
+                      mc3,
+                      modeEt,
+                      rechercheExacte,
+                    );
+
+                    if (liste.isEmpty) {
+                      _popup("Aucun resultat");
+                      return;
+                    }
+
+                    final crit = modeEt ? "Mots-cles (ET)" : "Mots-cles (OU)";
+
+                    _currentList = liste;
+                    _modeRecherche = "MotsCles";
+
+                    _mc1Recherche = mc1;
+                    _mc2Recherche = mc2;
+                    _mc3Recherche = mc3;
+
+                    _modeEtRecherche = modeEt;
+                    _rechercheExacte = rechercheExacte;
+
+                    _critereActuel = crit;
+
+                    setState(() {});
+                  },
+                ),
+              );
+            },
+          ),
+
+          IconButton(
+            tooltip: "Générer PDF",
+            icon: const Icon(Icons.picture_as_pdf),
+            onPressed: _genererPDFListe,
+          ),
+
+          IconButton(
+            tooltip: "Ouvrir PDF",
+            icon: const Icon(Icons.open_in_new),
+            onPressed: _ouvrirPDFListe,
+          ),
+
+          IconButton(
+            tooltip: "Imprimer PDF",
+            icon: const Icon(Icons.print),
+            onPressed: _imprimerPDF,
           ),
         ],
       ),
@@ -232,7 +446,7 @@ class _DocumentListState extends State<DocumentList> {
                           );
 
                           if (updated == true) {
-                            await _charger();
+                            await _rechargerCritereActuel();
                           }
                         },
                         child: Padding(

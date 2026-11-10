@@ -14,6 +14,10 @@ import '../../services/storage_service.dart';
 
 import 'document_form.dart';
 
+import 'package:printing/printing.dart';
+
+import '../../pdf/document_fiche_pdf.dart';
+
 class DocumentDetail extends StatefulWidget {
   final List<DocumentModel> liste;
   final int index;
@@ -55,14 +59,12 @@ class _DocumentDetailState extends State<DocumentDetail> {
   Future<void> _charger() async {
     setState(() => _loading = true);
 
-    final idToLoad =
-        _doc?.id ?? widget.liste[_pos].id!;
+    final idToLoad = _doc?.id ?? widget.liste[_pos].id!;
 
     _doc = await _docService.getDocumentById(idToLoad);
 
     if (_doc?.globId != null) {
-      _info =
-          await _globService.getById(_doc!.globId!);
+      _info = await _globService.getById(_doc!.globId!);
     } else {
       _info = null;
     }
@@ -79,8 +81,7 @@ class _DocumentDetailState extends State<DocumentDetail> {
   }
 
   Future<void> _ouvrirChronique() async {
-    final path =
-        _doc?.chroniqueUrl?.trim() ?? "";
+    final path = _doc?.chroniqueUrl?.trim() ?? "";
 
     if (path.isEmpty) return;
 
@@ -88,15 +89,11 @@ class _DocumentDetailState extends State<DocumentDetail> {
 
     if (parts.length != 2) return;
 
-    await _storageService.openStorageFile(
-      bucket: parts[0],
-      fileName: parts[1],
-    );
+    await _storageService.openStorageFile(bucket: parts[0], fileName: parts[1]);
   }
 
   Future<void> _sauvegarderChronique() async {
-    final path =
-        _doc?.chroniqueUrl?.trim() ?? "";
+    final path = _doc?.chroniqueUrl?.trim() ?? "";
 
     if (path.isEmpty) return;
 
@@ -104,38 +101,58 @@ class _DocumentDetailState extends State<DocumentDetail> {
 
     if (parts.length != 2) return;
 
-    await _storageService.saveStorageFile(
-      bucket: parts[0],
-      fileName: parts[1],
-    );
+    await _storageService.saveStorageFile(bucket: parts[0], fileName: parts[1]);
+  }
+
+  Future<void> _imprimerPDFIndividuel() async {
+    if (_doc == null) return;
+
+    final doc = _doc!;
+    final info = _info;
+
+    final dataDoc = {
+      "id": doc.id,
+      "dateSaisie": _fmt(doc.dateSaisie),
+      "titre": doc.titre,
+      "motCle1": doc.motCle1 ?? "",
+      "motCle2": doc.motCle2 ?? "",
+      "motCle3": doc.motCle3 ?? "",
+      "chroniqueUrl": doc.chroniqueUrl ?? "",
+      "rem": doc.rem ?? "",
+    };
+
+    final dataGlob = info == null
+        ? null
+        : {
+            "debut": _fmt(info.debut),
+            "fin": _fmt(info.fin),
+            "type": info.type ?? "DOC",
+          };
+
+    final bytes = await DocumentFichePdf.generate(doc: dataDoc, glob: dataGlob);
+
+    await Printing.layoutPdf(onLayout: (_) => bytes);
   }
 
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final doc = _doc!;
     final info = _info;
 
-    final bool ficheOfficielle =
-        widget.critere == null;
+    final bool ficheOfficielle = widget.critere == null;
 
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () =>
-              Navigator.pop(context, true),
+          onPressed: () => Navigator.pop(context, true),
         ),
 
-        title:
-            const Text("Fiche document"),
+        title: const Text("Fiche document"),
 
         actions: [
           if (ficheOfficielle)
@@ -143,17 +160,13 @@ class _DocumentDetailState extends State<DocumentDetail> {
               icon: const Icon(Icons.edit),
               tooltip: "Modifier",
               onPressed: () async {
-                final updated =
-                    await showDialog<bool>(
+                final updated = await showDialog<bool>(
                   context: context,
                   barrierDismissible: false,
                   builder: (_) => Dialog(
                     child: SizedBox(
                       width: 420,
-                      child: DocumentForm(
-                        doc: doc,
-                        info: info,
-                      ),
+                      child: DocumentForm(doc: doc, info: info),
                     ),
                   ),
                 );
@@ -164,167 +177,117 @@ class _DocumentDetailState extends State<DocumentDetail> {
               },
             ),
 
-          if (doc.chroniqueUrl != null &&
-              doc.chroniqueUrl!.isNotEmpty)
-            IconButton(
-              icon: const Icon(
-                Icons.open_in_new,
-              ),
-              tooltip: "Ouvrir",
-              onPressed: _ouvrirChronique,
-            ),
-
-          if (doc.chroniqueUrl != null &&
-              doc.chroniqueUrl!.isNotEmpty)
-            IconButton(
-              icon: const Icon(
-                Icons.save_alt,
-              ),
-              tooltip: "Sauvegarder",
-              onPressed:
-                  _sauvegarderChronique,
-            ),
-
           if (ficheOfficielle)
             IconButton(
               icon: const Icon(Icons.delete),
               tooltip: "Supprimer",
               onPressed: () async {
-                final confirm =
-                    await showDialog<bool>(
+                final confirm = await showDialog<bool>(
                   context: context,
                   barrierDismissible: false,
                   builder: (_) => AlertDialog(
-                    title:
-                        const Text("Supprimer"),
-                    content: Text(
-                      "Supprimer ${doc.titre} ?",
-                    ),
+                    title: const Text("Supprimer"),
+                    content: Text("Supprimer ${doc.titre} ?"),
                     actions: [
                       ElevatedButton(
-                        child: const Text(
-                            "Supprimer"),
-                        onPressed: () =>
-                            Navigator.pop(
-                                context,
-                                true),
+                        child: const Text("Supprimer"),
+                        onPressed: () => Navigator.pop(context, true),
                       ),
                       ElevatedButton(
-                        child:
-                            const Text("Annuler"),
-                        onPressed: () =>
-                            Navigator.pop(
-                                context,
-                                false),
+                        child: const Text("Annuler"),
+                        onPressed: () => Navigator.pop(context, false),
                       ),
                     ],
                   ),
                 );
 
                 if (confirm == true) {
-                  await _docService
-                      .deleteDocument(
-                          doc.id!);
+                  await _docService.deleteDocument(doc.id!);
 
                   if (!mounted) return;
 
-                  Navigator.pop(
-                      context, true);
+                  Navigator.pop(context, true);
                 }
               },
             ),
+
+          IconButton(
+            icon: const Icon(Icons.print),
+            tooltip: "Imprimer PDF",
+            onPressed: _imprimerPDFIndividuel,
+          ),
         ],
       ),
 
       body: Center(
         child: ConstrainedBox(
-          constraints:
-              const BoxConstraints(
-            maxWidth: 420,
-          ),
+          constraints: const BoxConstraints(maxWidth: 420),
           child: Padding(
-            padding:
-                const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             child: ListView(
               children: [
-                _ligne(
-                  "ID",
-                  "${doc.id}",
-                ),
+                _ligne("ID", "${doc.id}"),
 
-                _ligne(
-                  "Début",
-                  _fmt(info?.debut),
-                ),
+                _ligne("Début", _fmt(info?.debut)),
 
-                _ligne(
-                  "Fin",
-                  _fmt(info?.fin),
-                ),
+                _ligne("Fin", _fmt(info?.fin)),
 
-                _ligne(
-                  "Type",
-                  info?.type ?? "DOC",
-                ),
+                _ligne("Type", info?.type ?? "DOC"),
 
-                _ligne(
-                  "Date saisie",
-                  _fmt(
-                    doc.dateSaisie,
+                _ligne("Date saisie", _fmt(doc.dateSaisie)),
+
+                _ligne("Titre", doc.titre),
+
+                _ligne("Mot clé 1", doc.motCle1 ?? ""),
+
+                _ligne("Mot clé 2", doc.motCle2 ?? ""),
+
+                _ligne("Mot clé 3", doc.motCle3 ?? ""),
+
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(
+                        width: 100,
+                        child: Text(
+                          "Chronique",
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      Expanded(child: Text(doc.chroniqueUrl ?? "")),
+                      if (doc.chroniqueUrl != null &&
+                          doc.chroniqueUrl!.isNotEmpty)
+                        IconButton(
+                          icon: const Icon(Icons.open_in_new),
+                          tooltip: "Ouvrir",
+                          onPressed: _ouvrirChronique,
+                        ),
+                      if (doc.chroniqueUrl != null &&
+                          doc.chroniqueUrl!.isNotEmpty)
+                        IconButton(
+                          icon: const Icon(Icons.save_alt),
+                          tooltip: "Sauvegarder",
+                          onPressed: _sauvegarderChronique,
+                        ),
+                    ],
                   ),
-                ),
-
-                _ligne(
-                  "Titre",
-                  doc.titre,
-                ),
-
-                _ligne(
-                  "Mot clé 1",
-                  doc.motCle1 ?? "",
-                ),
-
-                _ligne(
-                  "Mot clé 2",
-                  doc.motCle2 ?? "",
-                ),
-
-                _ligne(
-                  "Mot clé 3",
-                  doc.motCle3 ?? "",
-                ),
-
-                _ligne(
-                  "Chronique",
-                  doc.chroniqueUrl ?? "",
                 ),
 
                 Padding(
-                  padding:
-                      const EdgeInsets.only(
-                    top: 10,
-                  ),
+                  padding: const EdgeInsets.only(top: 10),
                   child: Row(
-                    crossAxisAlignment:
-                        CrossAxisAlignment
-                            .start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(
                         width: 100,
                         child: Text(
                           "Remarques",
-                          style: TextStyle(
-                            fontWeight:
-                                FontWeight
-                                    .bold,
-                          ),
+                          style: TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
-                      Expanded(
-                        child: Text(
-                          doc.rem ?? "",
-                        ),
-                      ),
+                      Expanded(child: Text(doc.rem ?? "")),
                     ],
                   ),
                 ),
@@ -336,33 +299,20 @@ class _DocumentDetailState extends State<DocumentDetail> {
     );
   }
 
-  Widget _ligne(
-    String label,
-    String value,
-  ) {
+  Widget _ligne(String label, String value) {
     return Padding(
-      padding:
-          const EdgeInsets.only(
-        bottom: 10,
-      ),
+      padding: const EdgeInsets.only(bottom: 10),
       child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
             width: 100,
             child: Text(
               label,
-              style:
-                  const TextStyle(
-                fontWeight:
-                    FontWeight.bold,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
-          Expanded(
-            child: Text(value),
-          ),
+          Expanded(child: Text(value)),
         ],
       ),
     );
