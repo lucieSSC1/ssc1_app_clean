@@ -1,0 +1,28 @@
+-- 1. Création du type ENUM pour les catégories de recettes
+CREATE TYPE categorie_recette AS ENUM (
+    'soupe',
+    'entrée',
+    'plat principal',
+    'dessert',
+    'collation',
+    'boisson'
+);
+
+-- 2. Création de la table recette
+CREATE TABLE recette (
+    id          SERIAL PRIMARY KEY,
+
+    -- Chronologie
+    glob_id     INTEGER,              -- Lien vers glob_info
+
+    nom         TEXT,
+    categorie   categorie_recette,
+    source      TEXT,
+    recette_url TEXT,
+    notes       TEXT,
+
+    CONSTRAINT fk_recette_glob_info
+        FOREIGN KEY (glob_id)
+        REFERENCES glob_info(id)
+        ON DELETE SET NULL
+);

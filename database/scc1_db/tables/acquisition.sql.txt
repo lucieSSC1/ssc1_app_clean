@@ -1,0 +1,39 @@
+-- ============================================================
+-- TABLE : acquisition
+-- ------------------------------------------------------------
+-- Contient les acquisitions (objets achetés)
+-- Chaque acquisition peut être liée :
+--   - à global_info (glob_id)
+--   - à un vendeur (vendeur_id)
+-- ============================================================
+
+CREATE TABLE acquisition (
+    id           SERIAL PRIMARY KEY,
+
+    glob_id      INTEGER,
+
+    nom          TEXT NOT NULL,
+    description  TEXT,
+
+    vendeur_id   INTEGER,
+
+    garantie     TEXT,
+    expire       DATE,
+
+    prix         NUMERIC(10,2),
+
+    commentaire  TEXT,
+
+    image        TEXT,
+    facture      TEXT,
+
+    CONSTRAINT fk_acquisition_global_info
+        FOREIGN KEY (glob_id)
+        REFERENCES global_info(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT fk_acquisition_vendeur
+        FOREIGN KEY (vendeur_id)
+        REFERENCES vendeur(id)
+        ON DELETE SET NULL
+);

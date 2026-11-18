@@ -1,0 +1,21 @@
+-- reparateur.sql
+
+-- ============================================================
+-- TABLE : reparateur
+-- ------------------------------------------------------------
+-- Contient les informations sur un reparateur
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS reparateur (
+    id           SERIAL PRIMARY KEY,
+    nom          TEXT,
+    adresse      TEXT,
+    ville        TEXT,
+    prov         TEXT,
+    code_postal  TEXT,
+    pays         TEXT,
+    telephone    TEXT,
+    fax          TEXT,
+    courriel     TEXT,
+    site_url     TEXT
+);

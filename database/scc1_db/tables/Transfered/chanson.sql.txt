@@ -1,0 +1,22 @@
+-- ==============================================================
+-- = FICHIER : /base de donnees/sql/chanson.sql
+-- = CHANSON : TABLE
+-- ==============================================================
+
+CREATE TABLE IF NOT EXISTS chanson (
+    id              SERIAL PRIMARY KEY,
+
+    titre           TEXT NOT NULL,          -- nom de la chanson
+    artiste         TEXT,                   -- nom de l'artiste
+    album           TEXT,                   -- album d'origine
+    annee           INTEGER,                -- année de sortie
+
+    duree_sec       INTEGER,                -- durée en secondes
+    style           TEXT,                   -- rock, pop, jazz, etc.
+    langue          TEXT,                   -- fr, en, es, etc.
+
+    lien_youtube    TEXT,                   -- URL YouTube
+    note            TEXT,                   -- remarques diverses
+
+    created_at      TIMESTAMP DEFAULT NOW()
+);

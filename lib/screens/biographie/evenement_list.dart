@@ -16,7 +16,7 @@ import '../../services/evenement_service.dart';
 import '../../services/global_info_service.dart';
 import '../../services/event_categ_service.dart';
 
-import '../../pdf/chronologie_pdf.dart';
+import '../../pdf/evenement_pdf.dart';
 import '../../utils/pdf_saver.dart';
 
 import 'evenement_detail.dart';
@@ -110,7 +110,7 @@ class _EvenementListState extends State<EvenementList> {
         };
       }).toList();
 
-      final bytes = await ChronologiePdf.generate(
+      final bytes = await EvenementPdf.generate(
         data,
         "Liste des evenements",
         critere: _critereActuel,
@@ -147,7 +147,7 @@ class _EvenementListState extends State<EvenementList> {
         };
       }).toList();
 
-      final bytes = await ChronologiePdf.generate(
+      final bytes = await EvenementPdf.generate(
         data,
         "Liste des evenements",
         critere: _critereActuel,

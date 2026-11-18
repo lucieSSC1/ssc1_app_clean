@@ -1,0 +1,36 @@
+-- acquisition.sql
+
+-- ============================================================
+-- TABLE : acquisition
+-- ------------------------------------------------------------
+-- Contient les acquisitions (objets achetés)
+-- Chaque acquisition peut être liée :
+--   - à glob_info (glob_id)
+--   - à un vendeur (vendeur_id)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS acquisition (
+    id           SERIAL PRIMARY KEY,
+    glob_id      INTEGER,
+    nom          TEXT,
+    description  TEXT,
+    vendeur_id   INTEGER,
+    garantie     TEXT,
+    expire       DATE,     -- Date d'expiration de la garantie
+    prix         REAL,
+    commentaire  TEXT,
+    image        TEXT,     -- Lien hypertexte vers un PDF d'infos
+					-- (manuel d'instruction, image, etc.
+    facture      TEXT,     -- Lien hypertexte de facture PDF de
+					--  l'acquisition
+
+    CONSTRAINT acquisition_global_info
+        FOREIGN KEY (glob_id)
+        REFERENCES glob_info(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT acquisition_vendeur
+        FOREIGN KEY (vendeur_id)
+        REFERENCES vendeur(id)
+        ON DELETE SET NULL
+);

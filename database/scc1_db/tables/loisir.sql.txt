@@ -1,0 +1,35 @@
+CREATE TABLE loisir (
+    id SERIAL PRIMARY KEY,
+
+    glob_id INTEGER,
+
+    type TEXT,
+
+    titre TEXT,
+    description TEXT,
+    commentaire TEXT,
+
+    realisateur TEXT,
+    annee INTEGER,
+    genre TEXT,
+    duree INTEGER,
+    lien_bande_annonce TEXT,
+
+    artiste TEXT,
+    album TEXT,
+    paroles TEXT,
+    lien_audio TEXT,
+
+    fichier_word TEXT,
+    source TEXT,
+    temps_preparation INTEGER,
+    temps_cuisson INTEGER,
+
+    texte TEXT,
+    format TEXT,
+
+    CONSTRAINT fk_loisir_global_info
+        FOREIGN KEY (glob_id)
+        REFERENCES global_info(id)
+        ON DELETE SET NULL
+);

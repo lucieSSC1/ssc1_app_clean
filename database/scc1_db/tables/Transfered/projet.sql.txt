@@ -1,0 +1,34 @@
+-- ssc1_db/projet.sql
+-- base_donnee/projet.sql
+-- Structure 4 harmonisée
+
+CREATE TABLE IF NOT EXISTS projet (
+    id              SERIAL PRIMARY KEY,
+
+    -- Lien vers la chronologie globale
+    glob_id         INTEGER,
+
+    -- Informations principales
+    titre           TEXT NOT NULL,
+    categorie_id    INTEGER,        -- categorieId dans le modèle
+    domaine_id      INTEGER,        -- domaineId dans le modèle (liste hardcodée)
+
+    -- Contenu du projet
+    description     TEXT,
+    objectif        TEXT,
+
+    -- Notes et métadonnées
+    notes           TEXT,           -- anciennement "remarque"
+    tag             TEXT,
+    directory       TEXT,
+
+    CONSTRAINT fk_projet_globinfo
+        FOREIGN KEY (glob_id)
+        REFERENCES glob_info(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT fk_projet_categorie
+        FOREIGN KEY (categorie_id)
+        REFERENCES proj_categ(id)
+        ON DELETE SET NULL
+);

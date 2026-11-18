@@ -1,0 +1,18 @@
+CREATE TABLE film (
+    id          SERIAL PRIMARY KEY,
+
+    -- Chronologie
+    glob_id     INTEGER,          -- Lien vers glob_info
+
+    titre       TEXT,
+    description TEXT,
+    acteurs     TEXT,
+    realisateur TEXT,
+    affiche_url TEXT,
+    notes       TEXT,
+
+    CONSTRAINT fk_film_glob_info
+        FOREIGN KEY (glob_id)
+        REFERENCES glob_info(id)
+        ON DELETE SET NULL
+);

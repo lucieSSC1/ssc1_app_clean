@@ -1,110 +1,105 @@
 // ============================================================
 // FICHIER : lib/pdf/chronologie_pdf.dart
-// Version tableau — ID aligné à droite, colonnes vides pour espacement
+// SSC1 - Générateur de chronologie
 // ============================================================
 
 import 'dart:typed_data';
+
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:flutter/services.dart' show rootBundle;
+
+import '../models/chronologie_item.dart';
 
 class ChronologiePdf {
-  static Future<Uint8List> generate(
-    List<dynamic> data,
-    String titre, {
-    String? critere,
+  static Future<Uint8List> generate({
+    required List<ChronologieItem> items,
+    required DateTime debut,
+    required DateTime fin,
+    required List<String> types,
   }) async {
     final pdf = pw.Document();
 
     final roboto = pw.Font.ttf(
-      await rootBundle.load("assets/fonts/Roboto-Regular.ttf"),
+      await rootBundle.load('assets/fonts/Roboto-Regular.ttf'),
     );
+
     final robotoBold = pw.Font.ttf(
-      await rootBundle.load("assets/fonts/Roboto-Bold.ttf"),
+      await rootBundle.load('assets/fonts/Roboto-Bold.ttf'),
     );
+
+    String fmt(DateTime? d) {
+      if (d == null) return '';
+
+      return '${d.year.toString().padLeft(4, '0')}-'
+          '${d.month.toString().padLeft(2, '0')}-'
+          '${d.day.toString().padLeft(2, '0')}';
+    }
 
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(32),
+
         build: (context) => [
           pw.Text(
-            titre,
+            'CHRONOLOGIE SSC1',
             style: pw.TextStyle(
-              fontSize: 18, // 🔧 réduit
-              fontWeight: pw.FontWeight.bold,
               font: robotoBold,
+              fontSize: 18,
+              fontWeight: pw.FontWeight.bold,
             ),
           ),
 
-          if (critere != null) ...[
-            pw.SizedBox(height: 10),
-            pw.Text(
-              "Critère : $critere",
-              style: pw.TextStyle(
-                fontSize: 12, // 🔧 réduit
-                fontWeight: pw.FontWeight.bold,
-                font: robotoBold,
-              ),
-            ),
-          ],
+          pw.SizedBox(height: 12),
+
+          pw.Text(
+            'Période : ${fmt(debut)} à ${fmt(fin)}',
+            style: pw.TextStyle(font: robotoBold, fontSize: 11),
+          ),
+
+          pw.SizedBox(height: 4),
+
+          pw.Text(
+            'Types : ${types.join(", ")}',
+            style: pw.TextStyle(font: robotoBold, fontSize: 11),
+          ),
 
           pw.SizedBox(height: 20),
 
           pw.Table(
             border: null,
 
-            // ⭐⭐⭐ Colonnes avec séparateurs vides ⭐⭐⭐
             columnWidths: {
-              0: pw.FixedColumnWidth(35), // ID 45
-              1: pw.FixedColumnWidth(10), // espace
-              2: pw.FixedColumnWidth(70), // Début
-              3: pw.FixedColumnWidth(5), // espace
-              4: pw.FixedColumnWidth(70), // Fin
-              5: pw.FixedColumnWidth(5), // espace
-              6: pw.FixedColumnWidth(50), // Type
-              7: pw.FixedColumnWidth(5), // espace
-              8: pw.FlexColumnWidth(), // Nom
+              0: const pw.FixedColumnWidth(80), // Début
+              1: const pw.FixedColumnWidth(80), // Fin
+              2: const pw.FixedColumnWidth(45), // Type
+              3: const pw.FlexColumnWidth(), // Description
             },
 
             children: [
               pw.TableRow(
                 children: [
-                  _header("ID", robotoBold),
-                  pw.Text(""),
-                  _header("Début", robotoBold),
-                  pw.Text(""),
-                  _header("Fin", robotoBold),
-                  pw.Text(""),
-                  _header("Type", robotoBold),
-                  pw.Text(""),
-                  _header("Nom", robotoBold),
+                  _header('Début', robotoBold),
+                  _header('Fin', robotoBold),
+                  _header('Type', robotoBold),
+                  _header('Description', robotoBold),
                 ],
               ),
 
-              ...data.map((e) {
-                final id = e["id"];
-                final idStr = id == null ? "" : id.toString().padLeft(4, ' ');
-
-                final debut = e["debut"] ?? "";
-                final fin = e["fin"] ?? "";
-                final type = e["type"] ?? "";
-                final nom = e["nom"] ?? "";
-
-                return pw.TableRow(
+              ...items.map(
+                (item) => pw.TableRow(
                   children: [
-                    _cell(idStr, roboto, alignRight: true),
-                    pw.Text(""),
-                    _cell(debut, roboto),
-                    pw.Text(""),
-                    _cell(fin, roboto),
-                    pw.Text(""),
-                    _cell(type, roboto),
-                    pw.Text(""),
-                    _cell(nom, roboto),
+                    _cell(fmt(item.debut), roboto),
+
+                    _cell(fmt(item.fin), roboto),
+
+                    _cell(item.type, roboto),
+
+                    _cell(item.description, roboto),
                   ],
-                );
-              }).toList(),
+                ),
+              ),
             ],
           ),
         ],
@@ -114,33 +109,24 @@ class ChronologiePdf {
     return pdf.save();
   }
 
-  // ⭐⭐⭐ En‑têtes réduits (11 pt)
   static pw.Widget _header(String text, pw.Font font) {
     return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(vertical: 4),
+      padding: const pw.EdgeInsets.only(bottom: 6),
       child: pw.Text(
         text,
         style: pw.TextStyle(
-          fontWeight: pw.FontWeight.bold,
           font: font,
-          fontSize: 11, // 🔧 réduit
+          fontSize: 11,
+          fontWeight: pw.FontWeight.bold,
         ),
       ),
     );
   }
 
-  // ⭐⭐⭐ Contenu réduit (9 pt)
-  static pw.Widget _cell(String text, pw.Font font, {bool alignRight = false}) {
+  static pw.Widget _cell(String text, pw.Font font) {
     return pw.Padding(
       padding: const pw.EdgeInsets.symmetric(vertical: 3),
-      child: pw.Text(
-        text,
-        textAlign: alignRight ? pw.TextAlign.right : pw.TextAlign.left,
-        style: pw.TextStyle(
-          font: font,
-          fontSize: 9, // 🔧 réduit
-        ),
-      ),
+      child: pw.Text(text, style: pw.TextStyle(font: font, fontSize: 9)),
     );
   }
 }

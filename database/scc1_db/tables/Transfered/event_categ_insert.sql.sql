@@ -1,0 +1,15 @@
+INSERT INTO event_categ (nom) VALUES ('PERS');
+INSERT INTO event_categ (nom) VALUES ('DEMARCHE');
+INSERT INTO event_categ (nom) VALUES ('DEVELOP');
+INSERT INTO event_categ (nom) VALUES ('DIVERS');
+INSERT INTO event_categ (nom) VALUES ('DOCUMENTS');
+INSERT INTO event_categ (nom) VALUES ('ECRITURE');
+INSERT INTO event_categ (nom) VALUES ('ETUDE');
+INSERT INTO event_categ (nom) VALUES ('FINANCE');
+INSERT INTO event_categ (nom) VALUES ('EMPLOI');
+INSERT INTO event_categ (nom) VALUES ('LANGUES');
+INSERT INTO event_categ (nom) VALUES ('LOISIR');
+INSERT INTO event_categ (nom) VALUES ('MALADIE');
+INSERT INTO event_categ (nom) VALUES ('OCCUP-PRINC');
+INSERT INTO event_categ (nom) VALUES ('PROJET');
+INSERT INTO event_categ (nom) VALUES ('REORIENTATION');

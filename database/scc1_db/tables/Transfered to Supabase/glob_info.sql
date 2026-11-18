@@ -1,0 +1,8 @@
+-- ssc1_db/glob_info.sql
+
+CREATE TABLE IF NOT EXISTS glob_info (
+    id      SERIAL PRIMARY KEY,
+    debut   DATE,
+    fin     DATE,
+    type    TEXT NOT NULL
+);

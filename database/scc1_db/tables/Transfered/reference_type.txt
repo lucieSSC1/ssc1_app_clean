@@ -1,0 +1,6 @@
+CREATE TYPE reference_type AS ENUM (
+    'document',
+    'article',
+    'audio',
+    'video'
+);

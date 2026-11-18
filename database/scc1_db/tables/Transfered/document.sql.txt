@@ -1,0 +1,21 @@
+CREATE TABLE document (
+    id SERIAL PRIMARY KEY,
+
+    -- Chronologie
+    glob_id INTEGER,              -- Lien vers global_info
+
+    date_saisie DATE,
+    titre TEXT,
+
+    mot_cle1 TEXT,
+    mot_cle2 TEXT,
+    mot_cle3 TEXT,
+
+    chronique_url TEXT,           -- Lien vers le fichier (Word, PDF, etc.)
+    rem TEXT,                     -- Notes / remarques
+
+    CONSTRAINT fk_chronique_glob_info
+        FOREIGN KEY (glob_id)
+        REFERENCES glob_info(id)
+        ON DELETE SET NULL
+);

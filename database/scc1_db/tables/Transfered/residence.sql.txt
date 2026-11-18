@@ -1,0 +1,28 @@
+-- ssc1_db/tables/residences.sql
+--
+-- Table : residence
+-- -----------------
+-- Représente une résidence dans le module Biographie.
+-- Adresse = texte (pas une table séparée)
+-- Loyer = REAL
+-- Commentaire = rem dans l’ancienne structure
+-- glob_id = lien vers glob_info (début / fin)
+
+CREATE TABLE residence (
+    id SERIAL PRIMARY KEY,
+
+    -- Référence vers glob_info.id
+    glob_id INTEGER REFERENCES glob_info(id) ON DELETE SET NULL,
+
+    -- Adresse complète
+    adresse   TEXT NOT NULL,
+    ville     TEXT NOT NULL,
+    province  TEXT NOT NULL,
+    pays      TEXT NOT NULL,
+
+    -- Commentaire
+    commentaire TEXT,
+
+    -- Loyer mensuel
+    loyer REAL
+);

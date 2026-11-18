@@ -1,0 +1,19 @@
+-- maintenance.sql
+
+CREATE TABLE maintenance (
+    id  SERIAL PRIMARY KEY,
+    acqu_no INTEGER,          -- acquisition.id
+    date  DATE NOT NULL,      -- Date de la réparation
+    a_effectuer  TEXT,        -- Travail à effectuer
+    reparateur_id INTEGER,    -- Réparateur
+    effectue  TEXT,           -- Travail effectué
+    duree DECIMAL,            -- Durée
+    pieces DECIMAL,           -- Coût des pièces
+    cout DECIMAL,             -- Coût total
+    facture TEXT,             -- Lien PDF
+
+    CONSTRAINT maintenance_reparateur
+    FOREIGN KEY (reparateur_id)
+        REFERENCES reparateur(id)
+        ON DELETE SET NULL
+);

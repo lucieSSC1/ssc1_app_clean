@@ -1,0 +1,31 @@
+CREATE TABLE projet (
+    id SERIAL PRIMARY KEY,
+
+    glob_id INTEGER,
+
+    nom TEXT NOT NULL,
+
+    categorie_id INTEGER,
+
+    domaine TEXT,
+
+    description TEXT,
+
+    objectif TEXT,
+
+    remarque TEXT,
+
+    tag TEXT,
+
+    directory TEXT,
+
+    CONSTRAINT fk_projet_global_info
+        FOREIGN KEY (glob_id)
+        REFERENCES global_info(id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT fk_projet_categorie
+        FOREIGN KEY (categorie_id)
+        REFERENCES proj_categ(id)
+        ON DELETE SET NULL
+);

@@ -1,0 +1,15 @@
+-- base de donnee/lot.sql
+
+CREATE TABLE IF NOT EXISTS lot (
+    id          SERIAL PRIMARY KEY,
+    code        TEXT,
+    nom         TEXT,
+    description TEXT,
+    statut      BOOLEAN DEFAULT FALSE,
+    proj_id     INTEGER,
+
+    CONSTRAINT fk_lot_projet
+        FOREIGN KEY (proj_id)
+        REFERENCES projet(id)
+        ON DELETE SET NULL
+);
